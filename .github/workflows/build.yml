@@ -20,6 +20,22 @@ on:
           - both
           - stable
           - testing
+      stable_upstream_branch:
+        description: "稳定版上游分支"
+        required: false
+        default: "reF1nd-stable"
+        type: choice
+        options:
+          - reF1nd-stable
+          - reF1nd-stable-next
+      testing_upstream_branch:
+        description: "测试版上游分支"
+        required: false
+        default: "reF1nd-testing"
+        type: choice
+        options:
+          - reF1nd-testing
+          - reF1nd-testing-next
 
 permissions:
   contents: write
@@ -32,8 +48,8 @@ concurrency:
 env:
   # 上游仓库配置
   UPSTREAM_REPO: "https://github.com/reF1nd/sing-box.git"
-  UPSTREAM_STABLE_BRANCH: "reF1nd-stable"
-  UPSTREAM_TESTING_BRANCH: "reF1nd-testing"
+  UPSTREAM_STABLE_BRANCH: "${{ github.event.inputs.stable_upstream_branch || 'reF1nd-stable' }}"
+  UPSTREAM_TESTING_BRANCH: "${{ github.event.inputs.testing_upstream_branch || 'reF1nd-testing' }}"
   UPSTREAM_RELEASES_REPO: "reF1nd/sing-box-releases"
   UPSTREAM_SOURCE_REPO: "reF1nd/sing-box"
 
