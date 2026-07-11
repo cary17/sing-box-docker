@@ -119,7 +119,7 @@ jobs:
               -H "Accept: application/vnd.github+json" \
               -H "Authorization: Bearer ${{ github.token }}" \
               -H "X-GitHub-Api-Version: 2022-11-28" \
-              "https://api.github.com/repos/${{ env.UPSTREAM_SOURCE_REPO }}/tags?per_page=100" \
+              "https://api.github.com/repos/${{ env.UPSTREAM_RELEASES_REPO }}/tags?per_page=100" \
               -o "$TAGS_JSON"
 
             SELECTED="$(bash scripts/select-upstream-version.sh stable "$RELEASES_JSON" "$TAGS_JSON" "${{ steps.stable_local.outputs.version }}" "$TAG_PUBLISHED_AT")"
@@ -241,7 +241,7 @@ jobs:
               -H "Accept: application/vnd.github+json" \
               -H "Authorization: Bearer ${{ github.token }}" \
               -H "X-GitHub-Api-Version: 2022-11-28" \
-              "https://api.github.com/repos/${{ env.UPSTREAM_SOURCE_REPO }}/tags?per_page=100" \
+              "https://api.github.com/repos/${{ env.UPSTREAM_RELEASES_REPO }}/tags?per_page=100" \
               -o "$TAGS_JSON"
 
             SELECTED="$(bash scripts/select-upstream-version.sh testing "$RELEASES_JSON" "$TAGS_JSON" "${{ steps.testing_local.outputs.version }}" "$TAG_PUBLISHED_AT")"
