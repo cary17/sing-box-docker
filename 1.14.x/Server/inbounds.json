@@ -1,0 +1,84 @@
+{
+  "inbounds": [
+    {
+      "type": "snell",
+      "tag": "snell-v5",
+      "listen": "::",
+      "listen_port": 1000,
+      "version": 5,
+      "multi_user_authentication": "psk",
+      "users": [
+        {
+          "name": "Surge",
+          "psk": "W6ZEVXG+yZcqHInyzjzbKfowI2z6L8qCOlIOpzmjrk4="
+        },
+        {
+          "name": "sing-box",
+          "psk": "25CmK+hK9IKcrP1qGU32/05v3PzDWvb92vTFSidhUHI="
+        },
+        {
+          "name": "WireGuard",
+          "psk": "64UtvfrPH5mqfOHgxbSiceOraWo6cxstrjmExJYgcaw="
+        }
+      ]
+    },
+    {
+      "type": "snell",
+      "tag": "snell-v6",
+      "listen": "::",
+      "listen_port": 3000,
+      "version": 6,
+      "multi_user_authentication": "psk",
+      "users": [
+        {
+          "name": "Surge",
+          "psk": "w+bQn81+U/DtFuSia8OdoR+119WAqAqCzG+iFteKEKA="
+        },
+        {
+          "name": "sing-box",
+          "psk": "WZ08K1xj7iL2xgITPXMe+uN3EKEa+iDTwH3DKcqgYU4="
+        },
+        {
+          "name": "WireGuard",
+          "psk": "Sq76didxLaTVlVBS0XbP2aRddMSMk1TobOKKOoagOxA="
+        }
+      ],
+      "mode": "unshaped"
+    },
+    {
+      "type": "shadowsocks",
+      "tag": "ss-in",
+      "listen": "::",
+      "listen_port": 2000,
+      "method": "2022-blake3-aes-128-gcm",
+      "password": "8JCsPssfgS8tiRwiMlhARg==",
+      "users": [
+        {
+          "name": "Surge",
+          "password": "PCD2Z4o12bKUoFa3cC97Hw=="
+        },
+        {
+          "name": "sing-box",
+          "password": "z+KVg1sIYh7AhM7r+u3Qog=="
+        }
+      ],
+      "multiplex": {
+        "enabled": true,
+        "padding": true
+      }
+    }
+  ],
+    "route": {
+      "rules": [
+        {
+          "inbound": 
+          [
+            "snell-v5",
+            "snell-v6"
+          ],
+          "action": "route-options",
+          "udp_disable_domain_unmapping": true
+        }
+      ]
+    }
+}

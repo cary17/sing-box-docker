@@ -9,13 +9,17 @@
     {
       "type": "api",
       "listen": "::",
-      "listen_port": 9095,
+      "listen_port": 9090,
       "access_control_allow_private_network": true,
       "dashboard": {
         "enabled": true,
-        "path": "",
         "download_url": "https://github.com/SagerNet/sing-box-dashboard/archive/refs/heads/gh-pages.zip",
-        "update_interval": "1d"
+        "update_interval": "1d",
+        "http_client": {
+          "engine": "go",
+          "version": 2,
+          "detour": "US"
+        }
       },
       "tls": {
         "enabled": false

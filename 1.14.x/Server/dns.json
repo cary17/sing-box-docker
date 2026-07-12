@@ -3,14 +3,13 @@
     "servers": [
       {
         "type": "udp",
-        "tag": "local",
-        "server": "223.5.5.5"
+        "tag": "Google",
+        "server": "8.8.8.8"
       },
       {
-        "type": "resolved",
-        "tag": "resolved-in",
-        "service": "resolved",
-        "accept_default_resolvers": true
+        "type": "udp",
+        "tag": "Cloudflare",
+        "server": "1.0.0.1"
       },
       {
         "type": "fakeip",
@@ -21,15 +20,10 @@
     ],
     "rules": [
       {
-        "inbound": "tun-in",
-        "server": "resolved-in"
-      },
-      {
-        "domain_suffix": [
-          "msftncsi.com",
-          "msftconnecttest.com"
+        "inbound": [
+          "wireguard"
         ],
-        "server": "local"
+        "server": "Cloudflare"
       },
       {
         "query_type": [

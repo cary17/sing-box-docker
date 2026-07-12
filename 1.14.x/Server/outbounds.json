@@ -1,0 +1,13 @@
+{
+  "outbounds": [
+    {
+      "type": "direct",
+      "tag": "direct",
+      "domain_resolver": 
+        {
+          "server": "Google",
+          "strategy": "prefer_ipv4"
+        }
+    }
+  ]
+}

@@ -1,0 +1,8 @@
+{
+  "ntp": {
+    "enabled": true,
+    "server": "time.google.com",
+    "server_port": 123,
+    "interval": "10m"
+  }
+}

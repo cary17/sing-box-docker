@@ -1,0 +1,26 @@
+{
+  "endpoints": [
+    {
+      "type": "wireguard",
+      "tag": "wireguard",
+      "system": false,
+      "mtu": 1432,
+      "address": [
+        "172.16.0.2/32",
+        "2606:4700:110:883f:305b:f98d:5f3d:bcb3/128"
+      ],
+      "private_key": "yG4Z1Suep8DPO/4mD3b5zwnkMqNzN3Zv6AAm5jijcWU=",
+      "peers": [
+        {
+          "address": "engage.cloudflareclient.com",
+          "port": 2408,
+          "public_key": "bmXOC+F1FxEMF9dyiK2H5/1SUtzH0JuVo51h2wPfgyo=",
+          "allowed_ips": [
+            "0.0.0.0/0"
+          ],
+          "reserved": [254, 108, 109]
+        }
+      ]
+    }
+  ]
+}

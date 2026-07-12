@@ -1,0 +1,10 @@
+{
+  "experimental": {
+    "cache_file": {
+      "enabled": true,
+      "path": "/var/lib/sing-box/cache.db",
+      "store_fakeip": true,
+      "store_dns": true
+    }
+  }
+}
