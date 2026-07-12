@@ -4,7 +4,7 @@
       "type": "wireguard",
       "tag": "wireguard",
       "system": false,
-      "mtu": 1408,
+      "mtu": 1432,
       "address": [
         "172.16.0.2/32",
         "2606:4700:110:883f:305b:f98d:5f3d:bcb3/128"
