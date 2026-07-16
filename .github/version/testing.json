@@ -1,7 +1,7 @@
 {
   "channel": "testing",
-  "version": "v1.14.0-alpha.44-reF1nd",
-  "published_at": "2026-07-15T19:55:03+08:00",
-  "built_at": "2026-07-15T20:33:33+08:00",
-  "docker_tag": "v1.14.0-alpha.44"
+  "version": "v1.14.0-alpha.45-reF1nd",
+  "published_at": "2026-07-16T11:13:04+08:00",
+  "built_at": "2026-07-16T11:48:13+08:00",
+  "docker_tag": "v1.14.0-alpha.45"
 }
