@@ -1,0 +1,759 @@
+{
+  "inbounds": [
+    {
+      "type": "tun",
+      "tag": "tun-in",
+      "interface_name": "tun0",
+      "mtu": 1432,
+      "route_exclude_address": [
+        "192.168.0.0/16",
+        "10.0.0.0/8",
+        "172.16.0.0/12",
+        "fe80::/10"
+      ],
+      "stack": "mixed",
+      "address": [
+        "172.18.0.1/30"
+      ],
+      "auto_route": true,
+      "endpoint_independent_nat": true
+    },
+    {
+      "type": "direct",
+      "tag": "dns-in",
+      "listen": "::",
+      "listen_port": 53
+    },
+    {
+      "type": "mixed",
+      "tag": "download",
+      "listen": "::",
+      "listen_port": 9980,
+      "set_system_proxy": false
+    }
+  ],
+  "ntp": {
+    "enabled": true,
+    "server": "ntp.tencent.com",
+    "server_port": 123,
+    "interval": "10m"
+  },
+  "experimental": {
+    "cache_file": {
+      "enabled": true,
+      "path": "",
+      "store_fakeip": true,
+      "store_dns": true
+    }
+  },
+  "dns": {
+    "servers": [
+      {
+        "type": "udp",
+        "tag": "local",
+        "server": "223.6.6.6"
+      },
+      {
+        "type": "fakeip",
+        "tag": "fakeip",
+        "inet4_range": "198.18.0.0/15"
+      }
+    ],
+    "rules": [
+      {
+        "domain_suffix": [
+          "msftncsi.com",
+          "msftconnecttest.com"
+        ],
+        "server": "local"
+      },
+      {
+        "query_type": [
+          "A"
+        ],
+        "server": "fakeip"
+      }
+    ],
+    "strategy": "prefer_ipv4",
+    "reverse_mapping": false,
+    "disable_cache": false,
+    "disable_expire": false,
+    "cache_capacity": 102400
+  },
+  "log": {
+    "disabled": false,
+    "level": "info",
+    "timestamp": true
+  },
+  "outbounds": [
+    {
+      "tag": "Proxy",
+      "type": "selector",
+      "outbounds":  [
+        "MISAKA-HKG", 
+        "Ali-MISAKA-HKG", 
+        "DMIT-HKG", 
+        "Ali-DMIT-HKG", 
+        "MISAKA-TYO", 
+        "Ali-MISAKA-TYO", 
+        "MISAKA-SJC",
+        "MISAKA-DE"
+      ],
+      "interrupt_exist_connections": true
+    },
+    {
+      "tag": "Streaming Media",
+      "type": "selector",
+      "outbounds": [
+        "Ali-MISAKA-HKG", 
+        "Ali-DMIT-HKG", 
+        "Ali-MISAKA-TYO"
+      ],
+      "interrupt_exist_connections": true
+    },
+    {
+      "tag": "Paypal",
+      "type": "selector",
+      "outbounds":  [
+        "MISAKA-HKG", 
+        "Ali-MISAKA-HKG", 
+        "DMIT-HKG", 
+        "Ali-DMIT-HKG", 
+        "MISAKA-SJC"
+      ],
+      "interrupt_exist_connections": true
+    },
+    {
+      "tag": "AI",
+      "type": "urltest",
+      "outbounds": [
+        "US",
+        "JP"
+      ],
+      "url": "http://1.1.1.1/generate_204",
+      "interval": "1m",
+      "idle_timeout": "30m",
+      "use_all_providers": false,
+      "interrupt_exist_connections": true,
+      "fallback": {
+        "enabled": true
+      }
+    },
+    {
+      "tag": "HK",
+      "type": "urltest",
+      "outbounds": [
+        "MISAKA-HKG",
+        "Ali-MISAKA-HKG",
+        "DMIT-HKG",
+        "Ali-DMIT-HKG"
+      ],
+      "url": "http://1.1.1.1/generate_204",
+      "interval": "1m",
+      "idle_timeout": "30m",
+      "use_all_providers": false,
+      "interrupt_exist_connections": true,
+      "fallback": {
+        "enabled": true
+      }
+    },
+    {
+      "tag": "JP",
+      "type": "urltest",
+      "outbounds": [
+        "MISAKA-TYO",
+        "Ali-MISAKA-TYO"
+      ],
+      "url": "http://1.1.1.1/generate_204",
+      "interval": "1m",
+      "idle_timeout": "30m",
+      "use_all_providers": false,
+      "interrupt_exist_connections": true,
+      "fallback": {
+        "enabled": true
+      }
+    },
+    {
+      "tag": "US",
+      "type": "urltest",
+      "outbounds": [
+        "MISAKA-SJC"
+      ],
+      "url": "http://1.1.1.1/generate_204",
+      "interval": "1m",
+      "idle_timeout": "30m",
+      "use_all_providers": false,
+      "interrupt_exist_connections": true,
+      "fallback": {
+        "enabled": true
+      }
+    },
+    {
+      "tag": "EU",
+      "type": "urltest",
+      "outbounds": [
+        "MISAKA-DE"
+      ],
+      "url": "http://1.1.1.1/generate_204",
+      "interval": "1m",
+      "idle_timeout": "30m",
+      "use_all_providers": false,
+      "interrupt_exist_connections": true,
+      "fallback": {
+        "enabled": true
+      }
+    },
+    {
+      "tag": "WARP",
+      "type": "urltest",
+      "outbounds": [
+        "Ali-MISAKA-HKG-WARP",
+        "Ali-DMIT-HKG-WARP",
+        "Ali-MISAKA-TYO-WARP"
+      ],
+      "url": "http://1.1.1.1/generate_204",
+      "interval": "1m",
+      "idle_timeout": "30m",
+      "use_all_providers": false,
+      "interrupt_exist_connections": true,
+      "fallback": {
+        "enabled": true
+      }
+    },
+    {
+      "tag": "GLOBAL",
+      "type": "urltest",
+      "outbounds":  [
+        "MISAKA-HKG", 
+        "Ali-MISAKA-HKG", 
+        "DMIT-HKG", 
+        "Ali-DMIT-HKG", 
+        "MISAKA-TYO", 
+        "Ali-MISAKA-TYO", 
+        "MISAKA-SJC",
+        "MISAKA-DE"
+      ],
+      "url": "http://1.1.1.1/generate_204",
+      "interval": "1m",
+      "idle_timeout": "30m",
+      "use_all_providers": false,
+      "interrupt_exist_connections": true,
+      "fallback": {
+        "enabled": true
+      }
+    },
+    {
+      "tag": "FINAL",
+      "type": "selector",
+      "outbounds":  [
+        "Proxy",
+        "GLOBAL",
+        "HK", 
+        "JP", 
+        "US", 
+        "EU"
+      ],
+      "default": "GLOBAL",
+      "interrupt_exist_connections": true
+    },
+    {
+      "tag": "Download",
+      "type": "selector",
+      "outbounds":  [
+        "Ali-MISAKA-HKG", 
+        "Ali-DMIT-HKG",
+        "Ali-MISAKA-TYO"
+      ],
+      "default": "Ali-MISAKA-HKG",
+      "interrupt_exist_connections": true
+    },
+    {
+      "type": "direct",
+      "tag": "Direct",
+      "domain_resolver": 
+        {
+          "server": "local",
+          "strategy": "prefer_ipv4"
+        }
+    },
+    {
+      "type": "snell",
+      "tag": "MISAKA-HKG",
+      "server": "11.11.11.11",
+      "server_port": 10000,
+      "psk": "DN7VXtB1blXOTKwF2pnYjm+uqYsFTfRAzsZlwRx7A8U=",
+      "version": 6,
+      "reuse": true,
+      "mode": "unshaped"
+    },
+    {
+      "type": "snell",
+      "tag": "Ali-MISAKA-HKG",
+      "server": "11.11.11.11",
+      "server_port": 10000,
+      "psk": "DN7VXtB1blXOTKwF2pnYjm+uqYsFTfRAzsZlwRx7A8U=",
+      "version": 6,
+      "reuse": true,
+      "mode": "unshaped"
+    },
+    {
+      "type": "snell",
+      "tag": "DMIT-HKG",
+      "server": "11.11.11.11",
+      "server_port": 10000,
+      "psk": "DN7VXtB1blXOTKwF2pnYjm+uqYsFTfRAzsZlwRx7A8U=",
+      "version": 6,
+      "reuse": true,
+      "mode": "unshaped"
+    },
+    {
+      "type": "snell",
+      "tag": "Ali-DMIT-HKG",
+      "server": "11.11.11.11",
+      "server_port": 10000,
+      "psk": "DN7VXtB1blXOTKwF2pnYjm+uqYsFTfRAzsZlwRx7A8U=",
+      "version": 6,
+      "reuse": true,
+      "mode": "unshaped"
+    },
+    {
+      "type": "snell",
+      "tag": "MISAKA-TYO",
+      "server": "11.11.11.11",
+      "server_port": 10000,
+      "psk": "DN7VXtB1blXOTKwF2pnYjm+uqYsFTfRAzsZlwRx7A8U=",
+      "version": 6,
+      "reuse": true,
+      "mode": "unshaped"
+    },
+    {
+      "type": "snell",
+      "tag": "Ali-MISAKA-TYO",
+      "server": "11.11.11.11",
+      "server_port": 10000,
+      "psk": "DN7VXtB1blXOTKwF2pnYjm+uqYsFTfRAzsZlwRx7A8U=",
+      "version": 6,
+      "reuse": true,
+      "mode": "unshaped"
+    },
+    {
+      "type": "snell",
+      "tag": "MISAKA-SJC",
+      "server": "11.11.11.11",
+      "server_port": 10000,
+      "psk": "DN7VXtB1blXOTKwF2pnYjm+uqYsFTfRAzsZlwRx7A8U=",
+      "version": 6,
+      "reuse": true,
+      "mode": "unshaped"
+    },
+    {
+      "type": "snell",
+      "tag": "MISAKA-DE",
+      "server": "11.11.11.11",
+      "server_port": 10000,
+      "psk": "DN7VXtB1blXOTKwF2pnYjm+uqYsFTfRAzsZlwRx7A8U=",
+      "version": 6,
+      "reuse": true,
+      "mode": "unshaped"
+    },
+    {
+      "type": "snell",
+      "tag": "Ali-MISAKA-HKG-WARP",
+      "server": "11.11.11.11",
+      "server_port": 10000,
+      "psk": "DN7VXtB1blXOTKwF2pnYjm+uqYsFTfRAzsZlwRx7A8U=",
+      "version": 6,
+      "reuse": true,
+      "mode": "unshaped"
+    },
+    {
+      "type": "snell",
+      "tag": "Ali-DMIT-HKG-WARP",
+      "server": "11.11.11.11",
+      "server_port": 10000,
+      "psk": "DN7VXtB1blXOTKwF2pnYjm+uqYsFTfRAzsZlwRx7A8U=",
+      "version": 6,
+      "reuse": true,
+      "mode": "unshaped"
+    },
+    {
+      "type": "snell",
+      "tag": "Ali-MISAKA-TYO-WARP",
+      "server": "11.11.11.11",
+      "server_port": 10000,
+      "psk": "DN7VXtB1blXOTKwF2pnYjm+uqYsFTfRAzsZlwRx7A8U=",
+      "version": 6,
+      "reuse": true,
+      "mode": "unshaped"
+    }
+  ],
+  "route": {
+    "rules": [
+      {
+        "action": "sniff"
+      },
+      {
+        "protocol": "dns",
+        "action": "hijack-dns"
+      },
+      {
+        "rule_set": [
+          "Claude",
+          "JetBrains",
+          "Gemini",
+          "OpenAI"
+        ],
+        "outbound": "AI"
+      },
+      {
+        "rule_set": [
+          "Binance"
+        ],
+        "outbound": "JP"
+      },
+      {
+        "rule_set": [
+          "N26",
+          "Kraken",
+          "Bybit"
+        ],
+        "outbound": "EU"
+      },
+      {
+        "rule_set": [
+          "Microsoft",
+          "Google",
+          "Meta",
+          "X"
+        ],
+        "outbound": "US"
+      },
+      {
+        "rule_set": [
+          "Spotify"
+        ],
+        "outbound": "HK"
+      },
+      {
+        "rule_set": [
+          "Twitch",
+          "Bahamut"
+        ],
+        "outbound": "Streaming Media"
+      },
+      {
+        "rule_set": "PayPal",
+        "outbound": "PayPal"
+      },
+      {
+        "rule_set": [
+          "Apple"
+        ],
+        "outbound": "GLOBAL"
+      },
+      {
+        "rule_set": [
+          "OKX",
+          "ifast",
+          "Wise"
+        ],
+        "outbound": "Direct"
+      },
+      {
+        "rule_set": [
+          "Geosite-CN"
+        ],
+        "outbound": "Direct"
+      },
+      {
+        "network": "icmp",
+        "outbound": "Direct"
+      },
+      {
+        "ip_is_private": true,
+        "outbound": "Direct"
+      },
+      {
+        "rule_set": [
+          "Geoip-CN"
+        ],
+        "outbound": "Direct"
+      },
+      {
+        "inbound": [
+          "download"
+        ],
+        "outbound": "Download"
+      }
+    ],
+    "rule_set": [
+      {
+        "tag": "Geoip-CN",
+        "type": "remote",
+        "format": "binary",
+        "url": "https://raw.githubusercontent.com/Loyalsoldier/geoip/release/srs/cn.srs",
+        "update_interval": "12h",
+        "http_client": {
+          "engine": "go",
+          "version": 2,
+          "detour": "US"
+        }
+      },
+      {
+        "tag": "Geosite-CN",
+        "type": "remote",
+        "format": "binary",
+        "url": "https://raw.githubusercontent.com/lyc8503/sing-box-rules/rule-set-geosite/geosite-cn.srs",
+        "update_interval": "12h",
+        "http_client": {
+          "engine": "go",
+          "version": 2,
+          "detour": "US"
+        }
+      },
+      {
+        "tag": "PayPal",
+        "type": "remote",
+        "format": "binary",
+        "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-paypal.srs",
+        "update_interval": "12h",
+        "http_client": {
+          "engine": "go",
+          "version": 2,
+          "detour": "US"
+        }
+      },
+      {
+        "tag": "Bahamut",
+        "type": "remote",
+        "format": "binary",
+        "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-bahamut.srs",
+        "update_interval": "12h",
+        "http_client": {
+          "engine": "go",
+          "version": 2,
+          "detour": "US"
+        }
+      },
+      {
+        "tag": "Twitch",
+        "type": "remote",
+        "format": "binary",
+        "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-twitch.srs",
+        "update_interval": "12h",
+        "http_client": {
+          "engine": "go",
+          "version": 2,
+          "detour": "US"
+        }
+      },
+      {
+        "tag": "Apple",
+        "type": "remote",
+        "format": "binary",
+        "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-apple.srs",
+        "update_interval": "12h",
+        "http_client": {
+          "engine": "go",
+          "version": 2,
+          "detour": "US"
+        }
+      },
+      {
+        "tag": "Google",
+        "type": "remote",
+        "format": "binary",
+        "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-google.srs",
+        "update_interval": "12h",
+        "http_client": {
+          "engine": "go",
+          "version": 2,
+          "detour": "US"
+        }
+      },
+      {
+        "tag": "Claude",
+        "type": "remote",
+        "format": "binary",
+        "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-anthropic.srs",
+        "update_interval": "12h",
+        "http_client": {
+          "engine": "go",
+          "version": 2,
+          "detour": "US"
+        }
+      },
+      {
+        "tag": "Gemini",
+        "type": "remote",
+        "format": "binary",
+        "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-google-gemini.srs",
+        "update_interval": "12h",
+        "http_client": {
+          "engine": "go",
+          "version": 2,
+          "detour": "US"
+        }
+      },
+      {
+        "tag": "Microsoft",
+        "type": "remote",
+        "format": "binary",
+        "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-microsoft.srs",
+        "update_interval": "12h",
+        "http_client": {
+          "engine": "go",
+          "version": 2,
+          "detour": "US"
+        }
+      },
+      {
+        "tag": "OpenAI",
+        "type": "remote",
+        "format": "binary",
+        "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-openai.srs",
+        "update_interval": "12h",
+        "http_client": {
+          "engine": "go",
+          "version": 2,
+          "detour": "US"
+        }
+      },
+      {
+        "tag": "JetBrains",
+        "type": "remote",
+        "format": "binary",
+        "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-jetbrains-ai.srs",
+        "update_interval": "12h",
+        "http_client": {
+          "engine": "go",
+          "version": 2,
+          "detour": "US"
+        }
+      },
+      {
+        "tag": "Meta",
+        "type": "remote",
+        "format": "binary",
+        "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-meta.srs",
+        "update_interval": "12h",
+        "http_client": {
+          "engine": "go",
+          "version": 2,
+          "detour": "US"
+        }
+      },
+      {
+        "tag": "X",
+        "type": "remote",
+        "format": "binary",
+        "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-x.srs",
+        "update_interval": "12h",
+        "http_client": {
+          "engine": "go",
+          "version": 2,
+          "detour": "US"
+        }
+      },
+      {
+        "tag": "Spotify",
+        "type": "remote",
+        "format": "binary",
+        "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-spotify.srs",
+        "update_interval": "12h",
+        "http_client": {
+          "engine": "go",
+          "version": 2,
+          "detour": "US"
+        }
+      },
+      {
+        "tag": "Binance",
+        "type": "remote",
+        "format": "binary",
+        "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-binance.srs",
+        "update_interval": "1h",
+        "http_client": {
+          "engine": "go",
+          "version": 2,
+          "detour": "US"
+        }
+      },
+      {
+        "tag": "Kraken",
+        "type": "remote",
+        "format": "binary",
+        "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-kraken.srs",
+        "update_interval": "1h",
+        "http_client": {
+          "engine": "go",
+          "version": 2,
+          "detour": "US"
+        }
+      },
+      {
+        "tag": "N26",
+        "type": "remote",
+        "format": "binary",
+        "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-n26.srs",
+        "update_interval": "1h",
+        "http_client": {
+          "engine": "go",
+          "version": 2,
+          "detour": "US"
+        }
+      },
+      {
+        "tag": "Bybit",
+        "type": "remote",
+        "format": "binary",
+        "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-bybit.srs",
+        "update_interval": "1h",
+        "http_client": {
+          "engine": "go",
+          "version": 2,
+          "detour": "US"
+        }
+      },
+      {
+        "tag": "OKX",
+        "type": "remote",
+        "format": "binary",
+        "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-okx.srs",
+        "update_interval": "1h",
+        "http_client": {
+          "engine": "go",
+          "version": 2,
+          "detour": "US"
+        }
+      },
+      {
+        "tag": "Wise",
+        "type": "remote",
+        "format": "binary",
+        "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-wise.srs",
+        "update_interval": "1h",
+        "http_client": {
+          "engine": "go",
+          "version": 2,
+          "detour": "US"
+        }
+      },
+      {
+        "tag": "ifast",
+        "type": "remote",
+        "format": "binary",
+        "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-ifast.srs",
+        "update_interval": "1h",
+        "http_client": {
+          "engine": "go",
+          "version": 2,
+          "detour": "US"
+        }
+      }
+    ],
+    "final": "FINAL",
+    "default_domain_resolver": "local",
+    "auto_detect_interface": true
+  }
+}

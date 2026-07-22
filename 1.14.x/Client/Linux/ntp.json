@@ -1,0 +1,11 @@
+{
+  "ntp": {
+    "enabled": true,
+    //"server": "time.apple.com",
+    //"server": "time.google.com",
+    //"server": "time.cloudflare.com",
+    "server": "ntp.tencent.com",
+    "server_port": 123,
+    "interval": "10m"
+  }
+}
