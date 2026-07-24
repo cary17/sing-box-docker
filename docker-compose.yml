@@ -3,13 +3,15 @@ services:
     #image: cary17/sing-box:latest
     image: ghcr.io/cary17/sing-box:latest
     container_name: sing-box
-    privileged: true
-    restart: always
+    restart: unless-stopped
     network_mode: "host"
     environment:
       TZ: Asia/Shanghai
     cap_add:
-      - ALL
+      - NET_ADMIN
+      - NET_RAW
+    security_opt:
+      - no-new-privileges:true
     devices:
       - /dev/net/tun:/dev/net/tun
     volumes:

@@ -10,10 +10,12 @@ TAG_PUBLISHED_AT="${5:-2026-06-29T00:00:00+08:00}"
 case "$CHANNEL" in
   stable)
     RELEASE_FILTER='select(.draft == false and .prerelease == false)'
+    RELEASE_TAG_FILTER='test("^[vV]?[0-9]+\\.[0-9]+\\.[0-9]+-reF1nd(\\.[0-9]+)?$")'
     TAG_FILTER='test("^[vV]?[0-9]+\\.[0-9]+\\.[0-9]+-reF1nd(\\.[0-9]+)?$")'
     ;;
   testing)
     RELEASE_FILTER='select(.draft == false and .prerelease == true)'
+    RELEASE_TAG_FILTER='test("^[vV]?[0-9]+\\.[0-9]+\\.[0-9]+-[A-Za-z]+\\.[0-9]+-reF1nd(\\.[0-9]+)?$")'
     TAG_FILTER='test("^[vV]?[0-9]+\\.[0-9]+\\.[0-9]+-[A-Za-z]+\\.[0-9]+-reF1nd(\\.[0-9]+)?$")'
     ;;
   *)
@@ -63,7 +65,7 @@ beijing_time() {
 }
 
 release_entry="$(
-  jq -r ".[] | ${RELEASE_FILTER} | [.tag_name, (.published_at // .created_at)] | @tsv" "$RELEASES_JSON" |
+  jq -r ".[] | ${RELEASE_FILTER} | select(.tag_name | ${RELEASE_TAG_FILTER}) | [.tag_name, (.published_at // .created_at)] | @tsv" "$RELEASES_JSON" |
     while IFS=$'\t' read -r tag published_at; do
       [[ -n "$tag" ]] || continue
       printf '%s\t%s\t%s\n' "$(version_key "$tag")" "$(beijing_time "$published_at")" "$tag"

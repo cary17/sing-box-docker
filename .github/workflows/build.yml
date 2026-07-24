@@ -38,8 +38,7 @@ on:
           - reF1nd-testing-next
 
 permissions:
-  contents: write
-  packages: write
+  contents: read
 
 concurrency:
   group: build-${{ github.ref }}
@@ -73,7 +72,7 @@ jobs:
       testing_need_build: ${{ steps.testing_check.outputs.need_build }}
     steps:
       - name: Checkout Current Repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 0
 
@@ -90,24 +89,33 @@ jobs:
             PUBLISHED_AT=""
           fi
 
-          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
-          echo "published_at=${PUBLISHED_AT}" >> "$GITHUB_OUTPUT"
+          {
+            echo "version=${VERSION}"
+            echo "published_at=${PUBLISHED_AT}"
+          } >> "$GITHUB_OUTPUT"
 
       - name: 获取稳定版版本号
         id: stable_version
+        env:
+          LOCAL_VERSION: ${{ steps.stable_local.outputs.version }}
         run: |
           RELEASES_JSON="$RUNNER_TEMP/stable-releases.json"
           TAGS_JSON="$RUNNER_TEMP/stable-tags.json"
           TAG_PUBLISHED_AT="$(TZ=Asia/Shanghai date +'%Y-%m-%dT%H:%M:%S+08:00')"
 
           curl -fsSL \
+            --retry 3 \
+            --retry-delay 2 \
+            --retry-all-errors \
+            --connect-timeout 15 \
+            --max-time 120 \
             -H "Accept: application/vnd.github+json" \
             -H "Authorization: Bearer ${{ github.token }}" \
             -H "X-GitHub-Api-Version: 2022-11-28" \
             "https://api.github.com/repos/${{ env.UPSTREAM_RELEASES_REPO }}/releases?per_page=100" \
             -o "$RELEASES_JSON"
 
-          if SELECTED="$(bash scripts/select-upstream-version.sh stable "$RELEASES_JSON" "" "${{ steps.stable_local.outputs.version }}" "$TAG_PUBLISHED_AT")"; then
+          if SELECTED="$(bash scripts/select-upstream-version.sh stable "$RELEASES_JSON" "" "$LOCAL_VERSION" "$TAG_PUBLISHED_AT")"; then
             :
           else
             STATUS=$?
@@ -116,13 +124,18 @@ jobs:
             fi
 
             curl -fsSL \
+              --retry 3 \
+              --retry-delay 2 \
+              --retry-all-errors \
+              --connect-timeout 15 \
+              --max-time 120 \
               -H "Accept: application/vnd.github+json" \
               -H "Authorization: Bearer ${{ github.token }}" \
               -H "X-GitHub-Api-Version: 2022-11-28" \
               "https://api.github.com/repos/${{ env.UPSTREAM_RELEASES_REPO }}/tags?per_page=100" \
               -o "$TAGS_JSON"
 
-            SELECTED="$(bash scripts/select-upstream-version.sh stable "$RELEASES_JSON" "$TAGS_JSON" "${{ steps.stable_local.outputs.version }}" "$TAG_PUBLISHED_AT")"
+            SELECTED="$(bash scripts/select-upstream-version.sh stable "$RELEASES_JSON" "$TAGS_JSON" "$LOCAL_VERSION" "$TAG_PUBLISHED_AT")"
           fi
 
           VERSION="$(jq -r '.version' <<< "$SELECTED")"
@@ -130,9 +143,11 @@ jobs:
           DOCKER_TAG="$(jq -r '.docker_tag' <<< "$SELECTED")"
           SOURCE="$(jq -r '.source' <<< "$SELECTED")"
 
-          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
-          echo "published_at=${PUBLISHED_AT}" >> "$GITHUB_OUTPUT"
-          echo "docker_tag=${DOCKER_TAG}" >> "$GITHUB_OUTPUT"
+          {
+            echo "version=${VERSION}"
+            echo "published_at=${PUBLISHED_AT}"
+            echo "docker_tag=${DOCKER_TAG}"
+          } >> "$GITHUB_OUTPUT"
           echo "stable upstream version: ${VERSION}"
           echo "stable upstream published at: ${PUBLISHED_AT}"
           echo "stable upstream source: ${SOURCE}"
@@ -140,11 +155,12 @@ jobs:
 
       - name: 检查稳定版是否需要构建
         id: stable_check
+        env:
+          SELECTED_BRANCH: ${{ github.event.inputs.branch || 'both' }}
+          CURRENT: ${{ steps.stable_version.outputs.version }}
+          LOCAL: ${{ steps.stable_local.outputs.version }}
         run: |
           NEED="false"
-          SELECTED_BRANCH="${{ github.event.inputs.branch || 'both' }}"
-          CURRENT="${{ steps.stable_version.outputs.version }}"
-          LOCAL="${{ steps.stable_local.outputs.version }}"
 
           version_gt() {
             [[ -z "$2" ]] && return 0
@@ -220,24 +236,33 @@ jobs:
             PUBLISHED_AT=""
           fi
 
-          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
-          echo "published_at=${PUBLISHED_AT}" >> "$GITHUB_OUTPUT"
+          {
+            echo "version=${VERSION}"
+            echo "published_at=${PUBLISHED_AT}"
+          } >> "$GITHUB_OUTPUT"
 
       - name: 获取测试版版本号
         id: testing_version
+        env:
+          LOCAL_VERSION: ${{ steps.testing_local.outputs.version }}
         run: |
           RELEASES_JSON="$RUNNER_TEMP/testing-releases.json"
           TAGS_JSON="$RUNNER_TEMP/testing-tags.json"
           TAG_PUBLISHED_AT="$(TZ=Asia/Shanghai date +'%Y-%m-%dT%H:%M:%S+08:00')"
 
           curl -fsSL \
+            --retry 3 \
+            --retry-delay 2 \
+            --retry-all-errors \
+            --connect-timeout 15 \
+            --max-time 120 \
             -H "Accept: application/vnd.github+json" \
             -H "Authorization: Bearer ${{ github.token }}" \
             -H "X-GitHub-Api-Version: 2022-11-28" \
             "https://api.github.com/repos/${{ env.UPSTREAM_RELEASES_REPO }}/releases?per_page=100" \
             -o "$RELEASES_JSON"
 
-          if SELECTED="$(bash scripts/select-upstream-version.sh testing "$RELEASES_JSON" "" "${{ steps.testing_local.outputs.version }}" "$TAG_PUBLISHED_AT")"; then
+          if SELECTED="$(bash scripts/select-upstream-version.sh testing "$RELEASES_JSON" "" "$LOCAL_VERSION" "$TAG_PUBLISHED_AT")"; then
             :
           else
             STATUS=$?
@@ -246,13 +271,18 @@ jobs:
             fi
 
             curl -fsSL \
+              --retry 3 \
+              --retry-delay 2 \
+              --retry-all-errors \
+              --connect-timeout 15 \
+              --max-time 120 \
               -H "Accept: application/vnd.github+json" \
               -H "Authorization: Bearer ${{ github.token }}" \
               -H "X-GitHub-Api-Version: 2022-11-28" \
               "https://api.github.com/repos/${{ env.UPSTREAM_RELEASES_REPO }}/tags?per_page=100" \
               -o "$TAGS_JSON"
 
-            SELECTED="$(bash scripts/select-upstream-version.sh testing "$RELEASES_JSON" "$TAGS_JSON" "${{ steps.testing_local.outputs.version }}" "$TAG_PUBLISHED_AT")"
+            SELECTED="$(bash scripts/select-upstream-version.sh testing "$RELEASES_JSON" "$TAGS_JSON" "$LOCAL_VERSION" "$TAG_PUBLISHED_AT")"
           fi
 
           VERSION="$(jq -r '.version' <<< "$SELECTED")"
@@ -260,9 +290,11 @@ jobs:
           DOCKER_TAG="$(jq -r '.docker_tag' <<< "$SELECTED")"
           SOURCE="$(jq -r '.source' <<< "$SELECTED")"
 
-          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
-          echo "published_at=${PUBLISHED_AT}" >> "$GITHUB_OUTPUT"
-          echo "docker_tag=${DOCKER_TAG}" >> "$GITHUB_OUTPUT"
+          {
+            echo "version=${VERSION}"
+            echo "published_at=${PUBLISHED_AT}"
+            echo "docker_tag=${DOCKER_TAG}"
+          } >> "$GITHUB_OUTPUT"
           echo "testing upstream version: ${VERSION}"
           echo "testing upstream published at: ${PUBLISHED_AT}"
           echo "testing upstream source: ${SOURCE}"
@@ -270,11 +302,12 @@ jobs:
 
       - name: 检查测试版是否需要构建
         id: testing_check
+        env:
+          SELECTED_BRANCH: ${{ github.event.inputs.branch || 'both' }}
+          CURRENT: ${{ steps.testing_version.outputs.version }}
+          LOCAL: ${{ steps.testing_local.outputs.version }}
         run: |
           NEED="false"
-          SELECTED_BRANCH="${{ github.event.inputs.branch || 'both' }}"
-          CURRENT="${{ steps.testing_version.outputs.version }}"
-          LOCAL="${{ steps.testing_local.outputs.version }}"
 
           version_gt() {
             [[ -z "$2" ]] && return 0
@@ -342,43 +375,59 @@ jobs:
     name: 构建稳定版镜像
     runs-on: ubuntu-latest
     needs: check_versions
+    permissions:
+      contents: write
+      packages: write
     if: >-
       needs.check_versions.outputs.stable_need_build == 'true' &&
       (github.event_name != 'workflow_dispatch' || github.event.inputs.branch == 'both' || github.event.inputs.branch == 'stable')
     steps:
       - name: 克隆上游代码
+        id: source
         run: |
           echo "克隆 ${{ env.UPSTREAM_STABLE_BRANCH }} 分支..."
-          git clone --depth 1 --branch ${{ env.UPSTREAM_STABLE_BRANCH }} \
-            ${{ env.UPSTREAM_REPO }} src
+          for attempt in 1 2 3; do
+            if git clone --depth 1 --branch "${{ env.UPSTREAM_STABLE_BRANCH }}" \
+              "${{ env.UPSTREAM_REPO }}" src; then
+              break
+            fi
+            rm -rf src
+            [[ "$attempt" -lt 3 ]] || exit 1
+            sleep $((attempt * 2))
+          done
+          echo "source_commit=$(git -C src rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          echo "dockerfile_sha256=$(sha256sum src/Dockerfile | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
           echo "代码克隆完成"
 
       - name: Setup QEMU
-        uses: docker/setup-qemu-action@v3
+        uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3
 
       - name: Setup Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
 
       - name: Login to GHCR
-        uses: docker/login-action@v3
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
         with:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Login to Docker Hub
-        uses: docker/login-action@v3
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
         with:
           username: cary17
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: 构建并推送稳定版多架构镜像
-        uses: docker/build-push-action@v6
+        id: build
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
         with:
           context: src
           file: src/Dockerfile
           platforms: linux/amd64,linux/arm64,linux/386,linux/arm/v7,linux/arm/v6
           push: true
+          sbom: true
+          provenance: mode=max
           cache-from: type=gha,scope=stable
           cache-to: type=gha,mode=max,scope=stable
           tags: |
@@ -389,8 +438,38 @@ jobs:
             ${{ env.DOCKERHUB_IMAGE }}:latest
             ${{ env.DOCKERHUB_IMAGE }}:stable
 
+      - name: 校验稳定版多架构清单
+        run: |
+          EXPECTED_DIGEST="${{ steps.build.outputs.digest }}"
+          GHCR_MANIFEST="$(docker buildx imagetools inspect \
+            "${{ env.GHCR_IMAGE }}:${{ needs.check_versions.outputs.stable_docker_tag }}" \
+            --format '{{json .Manifest}}')"
+          DOCKERHUB_MANIFEST="$(docker buildx imagetools inspect \
+            "${{ env.DOCKERHUB_IMAGE }}:${{ needs.check_versions.outputs.stable_docker_tag }}" \
+            --format '{{json .Manifest}}')"
+          GHCR_DIGEST="$(jq -r '.digest' <<< "$GHCR_MANIFEST")"
+          DOCKERHUB_DIGEST="$(jq -r '.digest' <<< "$DOCKERHUB_MANIFEST")"
+
+          printf 'Expected digest: %s\nGHCR digest: %s\nDocker Hub digest: %s\n' \
+            "$EXPECTED_DIGEST" "$GHCR_DIGEST" "$DOCKERHUB_DIGEST"
+          [[ "$GHCR_DIGEST" == "$EXPECTED_DIGEST" ]]
+          [[ "$DOCKERHUB_DIGEST" == "$EXPECTED_DIGEST" ]]
+
+          EXPECTED_PLATFORMS=(linux/amd64 linux/arm64 linux/386 linux/arm/v7 linux/arm/v6)
+          for manifest in "$GHCR_MANIFEST" "$DOCKERHUB_MANIFEST"; do
+            ACTUAL_PLATFORMS="$(jq -r '
+              .manifests[]
+              | select(.platform.os != "unknown")
+              | (.platform.os + "/" + .platform.architecture
+                 + (if .platform.variant then "/" + .platform.variant else "" end))
+            ' <<< "$manifest")"
+            for platform in "${EXPECTED_PLATFORMS[@]}"; do
+              grep -qx "$platform" <<< "$ACTUAL_PLATFORMS"
+            done
+          done
+
       - name: Checkout Current Repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           path: repo
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -407,12 +486,22 @@ jobs:
             --arg published_at "${{ needs.check_versions.outputs.stable_published_at }}" \
             --arg built_at "$(TZ=Asia/Shanghai date +'%Y-%m-%dT%H:%M:%S+08:00')" \
             --arg docker_tag "${{ needs.check_versions.outputs.stable_docker_tag }}" \
+            --arg source_branch "${{ env.UPSTREAM_STABLE_BRANCH }}" \
+            --arg source_commit "${{ steps.source.outputs.source_commit }}" \
+            --arg dockerfile_sha256 "${{ steps.source.outputs.dockerfile_sha256 }}" \
+            --arg ghcr_digest "${{ steps.build.outputs.digest }}" \
+            --arg dockerhub_digest "${{ steps.build.outputs.digest }}" \
             '{
               channel: $channel,
               version: $version,
               published_at: $published_at,
               built_at: $built_at,
-              docker_tag: $docker_tag
+              docker_tag: $docker_tag,
+              source_branch: $source_branch,
+              source_commit: $source_commit,
+              dockerfile_sha256: $dockerfile_sha256,
+              ghcr_digest: $ghcr_digest,
+              dockerhub_digest: $dockerhub_digest
             }' > "$FILE"
 
           git config user.name "github-actions[bot]"
@@ -439,6 +528,10 @@ jobs:
         run: |
           EXPECTED="${{ needs.check_versions.outputs.stable_version }}"
           EXPECTED_PUBLISHED_AT="${{ needs.check_versions.outputs.stable_published_at }}"
+          EXPECTED_SOURCE_BRANCH="${{ env.UPSTREAM_STABLE_BRANCH }}"
+          EXPECTED_SOURCE_COMMIT="${{ steps.source.outputs.source_commit }}"
+          EXPECTED_DOCKERFILE_SHA256="${{ steps.source.outputs.dockerfile_sha256 }}"
+          EXPECTED_DIGEST="${{ steps.build.outputs.digest }}"
           FILE=".github/version/stable.json"
 
           if [[ ! -f "$FILE" ]]; then
@@ -449,6 +542,11 @@ jobs:
           ACTUAL=$(jq -r '.version // ""' "$FILE")
           ACTUAL_PUBLISHED_AT=$(jq -r '.published_at // ""' "$FILE")
           ACTUAL_BUILT_AT=$(jq -r '.built_at // ""' "$FILE")
+          ACTUAL_SOURCE_BRANCH=$(jq -r '.source_branch // ""' "$FILE")
+          ACTUAL_SOURCE_COMMIT=$(jq -r '.source_commit // ""' "$FILE")
+          ACTUAL_DOCKERFILE_SHA256=$(jq -r '.dockerfile_sha256 // ""' "$FILE")
+          ACTUAL_GHCR_DIGEST=$(jq -r '.ghcr_digest // ""' "$FILE")
+          ACTUAL_DOCKERHUB_DIGEST=$(jq -r '.dockerhub_digest // ""' "$FILE")
           if [[ "$ACTUAL" != "$EXPECTED" ]]; then
             echo "版本记录不正确"
             echo "期望: $EXPECTED"
@@ -465,13 +563,30 @@ jobs:
             echo "构建时间记录为空"
             exit 1
           fi
+          [[ "$ACTUAL_SOURCE_BRANCH" == "$EXPECTED_SOURCE_BRANCH" ]]
+          [[ "$ACTUAL_SOURCE_COMMIT" == "$EXPECTED_SOURCE_COMMIT" ]]
+          [[ "$ACTUAL_DOCKERFILE_SHA256" == "$EXPECTED_DOCKERFILE_SHA256" ]]
+          [[ "$ACTUAL_GHCR_DIGEST" == "$EXPECTED_DIGEST" ]]
+          [[ "$ACTUAL_DOCKERHUB_DIGEST" == "$EXPECTED_DIGEST" ]]
 
           git fetch origin "${GITHUB_REF_NAME}"
           REMOTE=$(git show "origin/${GITHUB_REF_NAME}:${FILE}" 2>/dev/null || true)
           REMOTE_VERSION=$(jq -r '.version // ""' <<< "$REMOTE")
           REMOTE_PUBLISHED_AT=$(jq -r '.published_at // ""' <<< "$REMOTE")
           REMOTE_BUILT_AT=$(jq -r '.built_at // ""' <<< "$REMOTE")
-          if [[ "$REMOTE_VERSION" != "$EXPECTED" || "$REMOTE_PUBLISHED_AT" != "$EXPECTED_PUBLISHED_AT" || -z "$REMOTE_BUILT_AT" ]]; then
+          REMOTE_SOURCE_BRANCH=$(jq -r '.source_branch // ""' <<< "$REMOTE")
+          REMOTE_SOURCE_COMMIT=$(jq -r '.source_commit // ""' <<< "$REMOTE")
+          REMOTE_DOCKERFILE_SHA256=$(jq -r '.dockerfile_sha256 // ""' <<< "$REMOTE")
+          REMOTE_GHCR_DIGEST=$(jq -r '.ghcr_digest // ""' <<< "$REMOTE")
+          REMOTE_DOCKERHUB_DIGEST=$(jq -r '.dockerhub_digest // ""' <<< "$REMOTE")
+          if [[ "$REMOTE_VERSION" != "$EXPECTED" ||
+                "$REMOTE_PUBLISHED_AT" != "$EXPECTED_PUBLISHED_AT" ||
+                -z "$REMOTE_BUILT_AT" ||
+                "$REMOTE_SOURCE_BRANCH" != "$EXPECTED_SOURCE_BRANCH" ||
+                "$REMOTE_SOURCE_COMMIT" != "$EXPECTED_SOURCE_COMMIT" ||
+                "$REMOTE_DOCKERFILE_SHA256" != "$EXPECTED_DOCKERFILE_SHA256" ||
+                "$REMOTE_GHCR_DIGEST" != "$EXPECTED_DIGEST" ||
+                "$REMOTE_DOCKERHUB_DIGEST" != "$EXPECTED_DIGEST" ]]; then
             echo "远端版本记录不正确"
             echo "期望: $EXPECTED"
             echo "远端版本: $REMOTE_VERSION"
@@ -484,61 +599,79 @@ jobs:
 
       - name: 构建摘要
         run: |
-          echo "## 稳定版构建完成" >> "$GITHUB_STEP_SUMMARY"
-          echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "| 项目 | 信息 |" >> "$GITHUB_STEP_SUMMARY"
-          echo "|------|------|" >> "$GITHUB_STEP_SUMMARY"
-          echo "| 上游版本 | ${{ needs.check_versions.outputs.stable_version }} |" >> "$GITHUB_STEP_SUMMARY"
-          echo "| 上游发布时间 | ${{ needs.check_versions.outputs.stable_published_at }} |" >> "$GITHUB_STEP_SUMMARY"
-          echo "| Docker tag | ${{ needs.check_versions.outputs.stable_docker_tag }} |" >> "$GITHUB_STEP_SUMMARY"
-          echo "| 架构 | amd64, arm64, 386, arm/v7, arm/v6 |" >> "$GITHUB_STEP_SUMMARY"
-          echo "| GHCR | \`${{ env.GHCR_IMAGE }}:${{ needs.check_versions.outputs.stable_docker_tag }}\` |" >> "$GITHUB_STEP_SUMMARY"
-          echo "| GHCR stable | \`${{ env.GHCR_IMAGE }}:stable\` |" >> "$GITHUB_STEP_SUMMARY"
-          echo "| Docker Hub | \`${{ env.DOCKERHUB_IMAGE }}:${{ needs.check_versions.outputs.stable_docker_tag }}\` |" >> "$GITHUB_STEP_SUMMARY"
-          echo "| Docker Hub stable | \`${{ env.DOCKERHUB_IMAGE }}:stable\` |" >> "$GITHUB_STEP_SUMMARY"
+          {
+            echo "## 稳定版构建完成"
+            echo ""
+            echo "| 项目 | 信息 |"
+            echo "|------|------|"
+            echo "| 上游版本 | ${{ needs.check_versions.outputs.stable_version }} |"
+            echo "| 上游发布时间 | ${{ needs.check_versions.outputs.stable_published_at }} |"
+            echo "| Docker tag | ${{ needs.check_versions.outputs.stable_docker_tag }} |"
+            echo "| 架构 | amd64, arm64, 386, arm/v7, arm/v6 |"
+            echo "| GHCR | \`${{ env.GHCR_IMAGE }}:${{ needs.check_versions.outputs.stable_docker_tag }}\` |"
+            echo "| GHCR stable | \`${{ env.GHCR_IMAGE }}:stable\` |"
+            echo "| Docker Hub | \`${{ env.DOCKERHUB_IMAGE }}:${{ needs.check_versions.outputs.stable_docker_tag }}\` |"
+            echo "| Docker Hub stable | \`${{ env.DOCKERHUB_IMAGE }}:stable\` |"
+          } >> "$GITHUB_STEP_SUMMARY"
 
   # ==================== 构建测试版 ====================
   build_testing:
     name: 构建测试版镜像
     runs-on: ubuntu-latest
     needs: check_versions
+    permissions:
+      contents: write
+      packages: write
     if: >-
       needs.check_versions.outputs.testing_need_build == 'true' &&
       (github.event_name != 'workflow_dispatch' || github.event.inputs.branch == 'both' || github.event.inputs.branch == 'testing')
     steps:
       - name: 克隆上游代码
+        id: source
         run: |
           echo "克隆 ${{ env.UPSTREAM_TESTING_BRANCH }} 分支..."
-          git clone --depth 1 --branch ${{ env.UPSTREAM_TESTING_BRANCH }} \
-            ${{ env.UPSTREAM_REPO }} src
+          for attempt in 1 2 3; do
+            if git clone --depth 1 --branch "${{ env.UPSTREAM_TESTING_BRANCH }}" \
+              "${{ env.UPSTREAM_REPO }}" src; then
+              break
+            fi
+            rm -rf src
+            [[ "$attempt" -lt 3 ]] || exit 1
+            sleep $((attempt * 2))
+          done
+          echo "source_commit=$(git -C src rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          echo "dockerfile_sha256=$(sha256sum src/Dockerfile | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
           echo "代码克隆完成"
 
       - name: Setup QEMU
-        uses: docker/setup-qemu-action@v3
+        uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3
 
       - name: Setup Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
 
       - name: Login to GHCR
-        uses: docker/login-action@v3
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
         with:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Login to Docker Hub
-        uses: docker/login-action@v3
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
         with:
           username: cary17
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: 构建并推送测试版多架构镜像
-        uses: docker/build-push-action@v6
+        id: build
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
         with:
           context: src
           file: src/Dockerfile
           platforms: linux/amd64,linux/arm64,linux/386,linux/arm/v7,linux/arm/v6
           push: true
+          sbom: true
+          provenance: mode=max
           cache-from: type=gha,scope=testing
           cache-to: type=gha,mode=max,scope=testing
           tags: |
@@ -547,8 +680,38 @@ jobs:
             ${{ env.DOCKERHUB_IMAGE }}:${{ needs.check_versions.outputs.testing_docker_tag }}
             ${{ env.DOCKERHUB_IMAGE }}:testing
 
+      - name: 校验测试版多架构清单
+        run: |
+          EXPECTED_DIGEST="${{ steps.build.outputs.digest }}"
+          GHCR_MANIFEST="$(docker buildx imagetools inspect \
+            "${{ env.GHCR_IMAGE }}:${{ needs.check_versions.outputs.testing_docker_tag }}" \
+            --format '{{json .Manifest}}')"
+          DOCKERHUB_MANIFEST="$(docker buildx imagetools inspect \
+            "${{ env.DOCKERHUB_IMAGE }}:${{ needs.check_versions.outputs.testing_docker_tag }}" \
+            --format '{{json .Manifest}}')"
+          GHCR_DIGEST="$(jq -r '.digest' <<< "$GHCR_MANIFEST")"
+          DOCKERHUB_DIGEST="$(jq -r '.digest' <<< "$DOCKERHUB_MANIFEST")"
+
+          printf 'Expected digest: %s\nGHCR digest: %s\nDocker Hub digest: %s\n' \
+            "$EXPECTED_DIGEST" "$GHCR_DIGEST" "$DOCKERHUB_DIGEST"
+          [[ "$GHCR_DIGEST" == "$EXPECTED_DIGEST" ]]
+          [[ "$DOCKERHUB_DIGEST" == "$EXPECTED_DIGEST" ]]
+
+          EXPECTED_PLATFORMS=(linux/amd64 linux/arm64 linux/386 linux/arm/v7 linux/arm/v6)
+          for manifest in "$GHCR_MANIFEST" "$DOCKERHUB_MANIFEST"; do
+            ACTUAL_PLATFORMS="$(jq -r '
+              .manifests[]
+              | select(.platform.os != "unknown")
+              | (.platform.os + "/" + .platform.architecture
+                 + (if .platform.variant then "/" + .platform.variant else "" end))
+            ' <<< "$manifest")"
+            for platform in "${EXPECTED_PLATFORMS[@]}"; do
+              grep -qx "$platform" <<< "$ACTUAL_PLATFORMS"
+            done
+          done
+
       - name: Checkout Current Repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           path: repo
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -565,12 +728,22 @@ jobs:
             --arg published_at "${{ needs.check_versions.outputs.testing_published_at }}" \
             --arg built_at "$(TZ=Asia/Shanghai date +'%Y-%m-%dT%H:%M:%S+08:00')" \
             --arg docker_tag "${{ needs.check_versions.outputs.testing_docker_tag }}" \
+            --arg source_branch "${{ env.UPSTREAM_TESTING_BRANCH }}" \
+            --arg source_commit "${{ steps.source.outputs.source_commit }}" \
+            --arg dockerfile_sha256 "${{ steps.source.outputs.dockerfile_sha256 }}" \
+            --arg ghcr_digest "${{ steps.build.outputs.digest }}" \
+            --arg dockerhub_digest "${{ steps.build.outputs.digest }}" \
             '{
               channel: $channel,
               version: $version,
               published_at: $published_at,
               built_at: $built_at,
-              docker_tag: $docker_tag
+              docker_tag: $docker_tag,
+              source_branch: $source_branch,
+              source_commit: $source_commit,
+              dockerfile_sha256: $dockerfile_sha256,
+              ghcr_digest: $ghcr_digest,
+              dockerhub_digest: $dockerhub_digest
             }' > "$FILE"
 
           git config user.name "github-actions[bot]"
@@ -597,6 +770,10 @@ jobs:
         run: |
           EXPECTED="${{ needs.check_versions.outputs.testing_version }}"
           EXPECTED_PUBLISHED_AT="${{ needs.check_versions.outputs.testing_published_at }}"
+          EXPECTED_SOURCE_BRANCH="${{ env.UPSTREAM_TESTING_BRANCH }}"
+          EXPECTED_SOURCE_COMMIT="${{ steps.source.outputs.source_commit }}"
+          EXPECTED_DOCKERFILE_SHA256="${{ steps.source.outputs.dockerfile_sha256 }}"
+          EXPECTED_DIGEST="${{ steps.build.outputs.digest }}"
           FILE=".github/version/testing.json"
 
           if [[ ! -f "$FILE" ]]; then
@@ -607,6 +784,11 @@ jobs:
           ACTUAL=$(jq -r '.version // ""' "$FILE")
           ACTUAL_PUBLISHED_AT=$(jq -r '.published_at // ""' "$FILE")
           ACTUAL_BUILT_AT=$(jq -r '.built_at // ""' "$FILE")
+          ACTUAL_SOURCE_BRANCH=$(jq -r '.source_branch // ""' "$FILE")
+          ACTUAL_SOURCE_COMMIT=$(jq -r '.source_commit // ""' "$FILE")
+          ACTUAL_DOCKERFILE_SHA256=$(jq -r '.dockerfile_sha256 // ""' "$FILE")
+          ACTUAL_GHCR_DIGEST=$(jq -r '.ghcr_digest // ""' "$FILE")
+          ACTUAL_DOCKERHUB_DIGEST=$(jq -r '.dockerhub_digest // ""' "$FILE")
           if [[ "$ACTUAL" != "$EXPECTED" ]]; then
             echo "版本记录不正确"
             echo "期望: $EXPECTED"
@@ -623,13 +805,30 @@ jobs:
             echo "构建时间记录为空"
             exit 1
           fi
+          [[ "$ACTUAL_SOURCE_BRANCH" == "$EXPECTED_SOURCE_BRANCH" ]]
+          [[ "$ACTUAL_SOURCE_COMMIT" == "$EXPECTED_SOURCE_COMMIT" ]]
+          [[ "$ACTUAL_DOCKERFILE_SHA256" == "$EXPECTED_DOCKERFILE_SHA256" ]]
+          [[ "$ACTUAL_GHCR_DIGEST" == "$EXPECTED_DIGEST" ]]
+          [[ "$ACTUAL_DOCKERHUB_DIGEST" == "$EXPECTED_DIGEST" ]]
 
           git fetch origin "${GITHUB_REF_NAME}"
           REMOTE=$(git show "origin/${GITHUB_REF_NAME}:${FILE}" 2>/dev/null || true)
           REMOTE_VERSION=$(jq -r '.version // ""' <<< "$REMOTE")
           REMOTE_PUBLISHED_AT=$(jq -r '.published_at // ""' <<< "$REMOTE")
           REMOTE_BUILT_AT=$(jq -r '.built_at // ""' <<< "$REMOTE")
-          if [[ "$REMOTE_VERSION" != "$EXPECTED" || "$REMOTE_PUBLISHED_AT" != "$EXPECTED_PUBLISHED_AT" || -z "$REMOTE_BUILT_AT" ]]; then
+          REMOTE_SOURCE_BRANCH=$(jq -r '.source_branch // ""' <<< "$REMOTE")
+          REMOTE_SOURCE_COMMIT=$(jq -r '.source_commit // ""' <<< "$REMOTE")
+          REMOTE_DOCKERFILE_SHA256=$(jq -r '.dockerfile_sha256 // ""' <<< "$REMOTE")
+          REMOTE_GHCR_DIGEST=$(jq -r '.ghcr_digest // ""' <<< "$REMOTE")
+          REMOTE_DOCKERHUB_DIGEST=$(jq -r '.dockerhub_digest // ""' <<< "$REMOTE")
+          if [[ "$REMOTE_VERSION" != "$EXPECTED" ||
+                "$REMOTE_PUBLISHED_AT" != "$EXPECTED_PUBLISHED_AT" ||
+                -z "$REMOTE_BUILT_AT" ||
+                "$REMOTE_SOURCE_BRANCH" != "$EXPECTED_SOURCE_BRANCH" ||
+                "$REMOTE_SOURCE_COMMIT" != "$EXPECTED_SOURCE_COMMIT" ||
+                "$REMOTE_DOCKERFILE_SHA256" != "$EXPECTED_DOCKERFILE_SHA256" ||
+                "$REMOTE_GHCR_DIGEST" != "$EXPECTED_DIGEST" ||
+                "$REMOTE_DOCKERHUB_DIGEST" != "$EXPECTED_DIGEST" ]]; then
             echo "远端版本记录不正确"
             echo "期望: $EXPECTED"
             echo "远端版本: $REMOTE_VERSION"
@@ -642,15 +841,17 @@ jobs:
 
       - name: 构建摘要
         run: |
-          echo "## 测试版构建完成" >> "$GITHUB_STEP_SUMMARY"
-          echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "| 项目 | 信息 |" >> "$GITHUB_STEP_SUMMARY"
-          echo "|------|------|" >> "$GITHUB_STEP_SUMMARY"
-          echo "| 上游版本 | ${{ needs.check_versions.outputs.testing_version }} |" >> "$GITHUB_STEP_SUMMARY"
-          echo "| 上游发布时间 | ${{ needs.check_versions.outputs.testing_published_at }} |" >> "$GITHUB_STEP_SUMMARY"
-          echo "| Docker tag | ${{ needs.check_versions.outputs.testing_docker_tag }} |" >> "$GITHUB_STEP_SUMMARY"
-          echo "| 架构 | amd64, arm64, 386, arm/v7, arm/v6 |" >> "$GITHUB_STEP_SUMMARY"
-          echo "| GHCR | \`${{ env.GHCR_IMAGE }}:${{ needs.check_versions.outputs.testing_docker_tag }}\` |" >> "$GITHUB_STEP_SUMMARY"
-          echo "| GHCR testing | \`${{ env.GHCR_IMAGE }}:testing\` |" >> "$GITHUB_STEP_SUMMARY"
-          echo "| Docker Hub | \`${{ env.DOCKERHUB_IMAGE }}:${{ needs.check_versions.outputs.testing_docker_tag }}\` |" >> "$GITHUB_STEP_SUMMARY"
-          echo "| Docker Hub testing | \`${{ env.DOCKERHUB_IMAGE }}:testing\` |" >> "$GITHUB_STEP_SUMMARY"
+          {
+            echo "## 测试版构建完成"
+            echo ""
+            echo "| 项目 | 信息 |"
+            echo "|------|------|"
+            echo "| 上游版本 | ${{ needs.check_versions.outputs.testing_version }} |"
+            echo "| 上游发布时间 | ${{ needs.check_versions.outputs.testing_published_at }} |"
+            echo "| Docker tag | ${{ needs.check_versions.outputs.testing_docker_tag }} |"
+            echo "| 架构 | amd64, arm64, 386, arm/v7, arm/v6 |"
+            echo "| GHCR | \`${{ env.GHCR_IMAGE }}:${{ needs.check_versions.outputs.testing_docker_tag }}\` |"
+            echo "| GHCR testing | \`${{ env.GHCR_IMAGE }}:testing\` |"
+            echo "| Docker Hub | \`${{ env.DOCKERHUB_IMAGE }}:${{ needs.check_versions.outputs.testing_docker_tag }}\` |"
+            echo "| Docker Hub testing | \`${{ env.DOCKERHUB_IMAGE }}:testing\` |"
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -1,0 +1,47 @@
+name: Validate repository
+
+on:
+  push:
+    paths:
+      - 'scripts/**'
+      - 'tests/**'
+      - 'docker-compose.yml'
+      - '.github/workflows/**'
+      - 'README.md'
+  pull_request:
+    paths:
+      - 'scripts/**'
+      - 'tests/**'
+      - 'docker-compose.yml'
+      - '.github/workflows/**'
+      - 'README.md'
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Install actionlint
+        env:
+          ACTIONLINT_VERSION: "1.7.12"
+          ACTIONLINT_SHA256: "8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8"
+        run: |
+          URL="https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
+          curl -fsSL --retry 3 --retry-delay 2 --retry-all-errors \
+            --connect-timeout 15 --max-time 120 "$URL" -o "$RUNNER_TEMP/actionlint.tar.gz"
+          echo "${ACTIONLINT_SHA256}  $RUNNER_TEMP/actionlint.tar.gz" | sha256sum -c -
+          tar -xzf "$RUNNER_TEMP/actionlint.tar.gz" -C "$RUNNER_TEMP" actionlint
+          install -m 0755 "$RUNNER_TEMP/actionlint" /usr/local/bin/actionlint
+      - name: Validate shell scripts and project policy
+        run: |
+          actionlint .github/workflows/*.yml
+          shellcheck scripts/select-upstream-version.sh tests/*.sh
+          bash -n scripts/select-upstream-version.sh
+          bash -n tests/test-project.sh tests/test-select-version.sh tests/test-cleanup-policy.sh
+          tests/test-select-version.sh
+          tests/test-cleanup-policy.sh
+          tests/test-project.sh
+          docker compose config --quiet
