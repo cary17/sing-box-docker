@@ -40,6 +40,15 @@ assert_not_contains "$WORKFLOW" 'docker/login-action@v3'
 assert_not_contains "$WORKFLOW" 'docker/build-push-action@v6'
 assert_contains "$WORKFLOW" 'actions/checkout@11d5960a326750d5838078e36cf38b85af677262'
 
+# 同一分支协调运行顺序，避免旧的定时运行使用过期 checkout 重写版本记录。
+# shellcheck disable=SC2016
+assert_contains "$WORKFLOW" 'group: build-${{ github.workflow }}-${{ github.ref }}'
+# shellcheck disable=SC2016
+assert_contains "$WORKFLOW" 'cancel-in-progress: ${{ github.event_name == '\''workflow_dispatch'\'' }}'
+assert_not_contains "$WORKFLOW" 'cancel-in-progress: false'
+# shellcheck disable=SC2016
+assert_contains "$WORKFLOW" 'ref: ${{ github.ref_name }}'
+
 # 构建记录与镜像摘要必须可追溯。
 assert_contains "$WORKFLOW" 'source_commit'
 assert_contains "$WORKFLOW" 'dockerfile_sha256'

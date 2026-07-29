@@ -41,8 +41,9 @@ permissions:
   contents: read
 
 concurrency:
-  group: build-${{ github.ref }}
-  cancel-in-progress: false
+  group: build-${{ github.workflow }}-${{ github.ref }}
+  # 手动构建优先；新的手动运行会取消旧运行，定时运行不会打断正在执行的构建。
+  cancel-in-progress: ${{ github.event_name == 'workflow_dispatch' }}
 
 env:
   # 上游仓库配置
@@ -74,6 +75,7 @@ jobs:
       - name: Checkout Current Repo
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
+          ref: ${{ github.ref_name }}
           fetch-depth: 0
 
       - name: 读取稳定版记录
@@ -472,6 +474,7 @@ jobs:
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           path: repo
+          ref: ${{ github.ref_name }}
           token: ${{ secrets.GITHUB_TOKEN }}
           fetch-depth: 0
 
@@ -714,6 +717,7 @@ jobs:
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           path: repo
+          ref: ${{ github.ref_name }}
           token: ${{ secrets.GITHUB_TOKEN }}
           fetch-depth: 0
 
