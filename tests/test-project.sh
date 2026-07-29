@@ -40,6 +40,11 @@ assert_not_contains "$WORKFLOW" 'docker/login-action@v3'
 assert_not_contains "$WORKFLOW" 'docker/build-push-action@v6'
 assert_contains "$WORKFLOW" 'actions/checkout@11d5960a326750d5838078e36cf38b85af677262'
 
+# 自动版本检查每 6 小时运行一次，避免无必要的高频构建检查。
+# shellcheck disable=SC2016
+assert_contains "$WORKFLOW" 'cron: "0 */6 * * *"'
+assert_not_contains "$WORKFLOW" 'cron: "0 */1 * * *"'
+
 # 同一分支协调运行顺序，避免旧的定时运行使用过期 checkout 重写版本记录。
 # shellcheck disable=SC2016
 assert_contains "$WORKFLOW" 'group: build-${{ github.workflow }}-${{ github.ref }}'
