@@ -6,17 +6,18 @@
         "tag": "openai",
         "format": "source",
         "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/blob/rule-set/geosite-openai.srs",
-        "update_interval": "1d",
-        "http_client": {
-          "engine": "go",
-          "version": 2,
-          "detour": "direct"
-        }
+        "update_interval": "1d"
       }
     ],
     "rules": [
       {
-        "action": "sniff"
+        "action": "sniff",
+        "sniffer": [
+          "http",
+          "tls",
+          "quic",
+          "dns"
+        ]
       },
       {
         "rule_set": "openai",
@@ -25,6 +26,7 @@
     ],
     "final": "direct",
     "default_domain_resolver": "Google",
+    "default_http_client": "default",
     "auto_detect_interface": false
   }
 }

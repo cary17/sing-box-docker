@@ -35,8 +35,7 @@
     ],
     "strategy": "prefer_ipv4",
     "reverse_mapping": false,
-    "disable_cache": false,
-    "disable_expire": false,
+    "optimistic": true,
     "cache_capacity": 51200
   }
 }
