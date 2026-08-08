@@ -25,8 +25,8 @@
         "US",
         "JP"
       ],
-      "url": "http://1.1.1.1/generate_204",
-      "interval": "1m",
+      "url": "https://1.1.1.1/generate_204",
+      "interval": "30s",
       "idle_timeout": "30m",
       "use_all_providers": false,
       "interrupt_exist_connections": true,
@@ -41,8 +41,8 @@
         "MISAKA-HKG",
         "DMIT-HKG"
       ],
-      "url": "http://1.1.1.1/generate_204",
-      "interval": "1m",
+      "url": "https://1.1.1.1/generate_204",
+      "interval": "30s",
       "idle_timeout": "30m",
       "use_all_providers": false,
       "interrupt_exist_connections": true,
@@ -56,8 +56,8 @@
       "outbounds": [
         "MISAKA-TYO"
       ],
-      "url": "http://1.1.1.1/generate_204",
-      "interval": "1m",
+      "url": "https://1.1.1.1/generate_204",
+      "interval": "30s",
       "idle_timeout": "30m",
       "use_all_providers": false,
       "interrupt_exist_connections": true,
@@ -71,8 +71,8 @@
       "outbounds": [
         "MISAKA-SJC"
       ],
-      "url": "http://1.1.1.1/generate_204",
-      "interval": "1m",
+      "url": "https://1.1.1.1/generate_204",
+      "interval": "30s",
       "idle_timeout": "30m",
       "use_all_providers": false,
       "interrupt_exist_connections": true,
@@ -86,8 +86,8 @@
       "outbounds": [
         "MISAKA-DE"
       ],
-      "url": "http://1.1.1.1/generate_204",
-      "interval": "1m",
+      "url": "https://1.1.1.1/generate_204",
+      "interval": "30s",
       "idle_timeout": "30m",
       "use_all_providers": false,
       "interrupt_exist_connections": true,
@@ -105,8 +105,8 @@
         "MISAKA-SJC",
         "MISAKA-DE"
       ],
-      "url": "http://1.1.1.1/generate_204",
-      "interval": "1m",
+      "url": "https://1.1.1.1/generate_204",
+      "interval": "30s",
       "idle_timeout": "30m",
       "use_all_providers": false,
       "interrupt_exist_connections": true,

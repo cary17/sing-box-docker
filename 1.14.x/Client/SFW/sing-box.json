@@ -136,8 +136,8 @@
         "US",
         "JP"
       ],
-      "url": "http://1.1.1.1/generate_204",
-      "interval": "1m",
+      "url": "https://1.1.1.1/generate_204",
+      "interval": "30s",
       "idle_timeout": "30m",
       "use_all_providers": false,
       "interrupt_exist_connections": true,
@@ -154,8 +154,8 @@
         "DMIT-HKG",
         "Ali-DMIT-HKG"
       ],
-      "url": "http://1.1.1.1/generate_204",
-      "interval": "1m",
+      "url": "https://1.1.1.1/generate_204",
+      "interval": "30s",
       "idle_timeout": "30m",
       "use_all_providers": false,
       "interrupt_exist_connections": true,
@@ -170,8 +170,8 @@
         "MISAKA-TYO",
         "Ali-MISAKA-TYO"
       ],
-      "url": "http://1.1.1.1/generate_204",
-      "interval": "1m",
+      "url": "https://1.1.1.1/generate_204",
+      "interval": "30s",
       "idle_timeout": "30m",
       "use_all_providers": false,
       "interrupt_exist_connections": true,
@@ -185,8 +185,8 @@
       "outbounds": [
         "MISAKA-SJC"
       ],
-      "url": "http://1.1.1.1/generate_204",
-      "interval": "1m",
+      "url": "https://1.1.1.1/generate_204",
+      "interval": "30s",
       "idle_timeout": "30m",
       "use_all_providers": false,
       "interrupt_exist_connections": true,
@@ -200,8 +200,8 @@
       "outbounds": [
         "MISAKA-DE"
       ],
-      "url": "http://1.1.1.1/generate_204",
-      "interval": "1m",
+      "url": "https://1.1.1.1/generate_204",
+      "interval": "30s",
       "idle_timeout": "30m",
       "use_all_providers": false,
       "interrupt_exist_connections": true,
@@ -217,8 +217,8 @@
         "Ali-DMIT-HKG-WARP",
         "Ali-MISAKA-TYO-WARP"
       ],
-      "url": "http://1.1.1.1/generate_204",
-      "interval": "1m",
+      "url": "https://1.1.1.1/generate_204",
+      "interval": "30s",
       "idle_timeout": "30m",
       "use_all_providers": false,
       "interrupt_exist_connections": true,
@@ -239,8 +239,8 @@
         "MISAKA-SJC",
         "MISAKA-DE"
       ],
-      "url": "http://1.1.1.1/generate_204",
-      "interval": "1m",
+      "url": "https://1.1.1.1/generate_204",
+      "interval": "30s",
       "idle_timeout": "30m",
       "use_all_providers": false,
       "interrupt_exist_connections": true,
