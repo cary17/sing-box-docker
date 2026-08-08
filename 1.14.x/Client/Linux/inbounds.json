@@ -12,6 +12,7 @@
       "tag": "tun-in",
       "interface_name": "tun0",
       "mtu": 1432,
+      "dns_mode": "hijack",
       "route_exclude_address": [
         "192.168.0.0/16",
         "10.0.0.0/8",

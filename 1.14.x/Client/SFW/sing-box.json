@@ -1,10 +1,12 @@
 {
+  "$schema": "https://sing-box.sagernet.org/schema.json",
   "inbounds": [
     {
       "type": "tun",
       "tag": "tun-in",
       "interface_name": "tun0",
       "mtu": 1432,
+      "dns_mode": "hijack",
       "route_exclude_address": [
         "192.168.0.0/16",
         "10.0.0.0/8",
@@ -23,13 +25,6 @@
       "tag": "dns-in",
       "listen": "::",
       "listen_port": 53
-    },
-    {
-      "type": "mixed",
-      "tag": "download",
-      "listen": "::",
-      "listen_port": 9980,
-      "set_system_proxy": false
     }
   ],
   "ntp": {
@@ -51,15 +46,26 @@
       {
         "type": "udp",
         "tag": "local",
-        "server": "223.6.6.6"
+        "server": "223.5.5.5"
+      },
+      {
+        "type": "resolved",
+        "tag": "resolved-in",
+        "service": "resolved",
+        "accept_default_resolvers": true
       },
       {
         "type": "fakeip",
         "tag": "fakeip",
-        "inet4_range": "198.18.0.0/15"
+        "inet4_range": "198.18.0.0/15",
+        "inet6_range": "fc00::/18"
       }
     ],
     "rules": [
+      {
+        "inbound": "tun-in",
+        "server": "resolved-in"
+      },
       {
         "domain_suffix": [
           "msftncsi.com",
@@ -69,16 +75,16 @@
       },
       {
         "query_type": [
-          "A"
+          "A",
+          "AAAA"
         ],
         "server": "fakeip"
       }
     ],
     "strategy": "prefer_ipv4",
+    "optimistic": true,
     "reverse_mapping": false,
-    "disable_cache": false,
-    "disable_expire": false,
-    "cache_capacity": 102400
+    "cache_capacity": 51200
   },
   "log": {
     "disabled": false,
@@ -390,11 +396,35 @@
   "route": {
     "rules": [
       {
-        "action": "sniff"
+        "action": "sniff",
+        "sniffer": [
+          "http",
+          "tls",
+          "quic",
+          "dns"
+        ]
       },
       {
         "protocol": "dns",
         "action": "hijack-dns"
+      },
+      {
+        "ip_is_private": true,
+        "outbound": "Direct"
+      },
+      {
+        "network": "icmp",
+        "outbound": "Direct"
+      },
+      {
+        "clash_mode": "Direct",
+        "action": "route",
+        "outbound": "Direct"
+      },
+      {
+        "clash_mode": "Global",
+        "action": "route",
+        "outbound": "Proxy"
       },
       {
         "rule_set": [
@@ -466,24 +496,10 @@
         "outbound": "Direct"
       },
       {
-        "network": "icmp",
-        "outbound": "Direct"
-      },
-      {
-        "ip_is_private": true,
-        "outbound": "Direct"
-      },
-      {
         "rule_set": [
           "Geoip-CN"
         ],
         "outbound": "Direct"
-      },
-      {
-        "inbound": [
-          "download"
-        ],
-        "outbound": "Download"
       }
     ],
     "rule_set": [
@@ -493,11 +509,7 @@
         "format": "binary",
         "url": "https://raw.githubusercontent.com/Loyalsoldier/geoip/release/srs/cn.srs",
         "update_interval": "12h",
-        "http_client": {
-          "engine": "go",
-          "version": 2,
-          "detour": "US"
-        }
+        "http_client": "http_client_US"
       },
       {
         "tag": "Geosite-CN",
@@ -505,11 +517,7 @@
         "format": "binary",
         "url": "https://raw.githubusercontent.com/lyc8503/sing-box-rules/rule-set-geosite/geosite-cn.srs",
         "update_interval": "12h",
-        "http_client": {
-          "engine": "go",
-          "version": 2,
-          "detour": "US"
-        }
+        "http_client": "http_client_US"
       },
       {
         "tag": "PayPal",
@@ -517,11 +525,7 @@
         "format": "binary",
         "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-paypal.srs",
         "update_interval": "12h",
-        "http_client": {
-          "engine": "go",
-          "version": 2,
-          "detour": "US"
-        }
+        "http_client": "http_client_US"
       },
       {
         "tag": "Bahamut",
@@ -529,11 +533,7 @@
         "format": "binary",
         "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-bahamut.srs",
         "update_interval": "12h",
-        "http_client": {
-          "engine": "go",
-          "version": 2,
-          "detour": "US"
-        }
+        "http_client": "http_client_US"
       },
       {
         "tag": "Twitch",
@@ -541,11 +541,7 @@
         "format": "binary",
         "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-twitch.srs",
         "update_interval": "12h",
-        "http_client": {
-          "engine": "go",
-          "version": 2,
-          "detour": "US"
-        }
+        "http_client": "http_client_US"
       },
       {
         "tag": "Apple",
@@ -553,11 +549,7 @@
         "format": "binary",
         "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-apple.srs",
         "update_interval": "12h",
-        "http_client": {
-          "engine": "go",
-          "version": 2,
-          "detour": "US"
-        }
+        "http_client": "http_client_US"
       },
       {
         "tag": "Google",
@@ -565,11 +557,7 @@
         "format": "binary",
         "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-google.srs",
         "update_interval": "12h",
-        "http_client": {
-          "engine": "go",
-          "version": 2,
-          "detour": "US"
-        }
+        "http_client": "http_client_US"
       },
       {
         "tag": "Claude",
@@ -577,11 +565,7 @@
         "format": "binary",
         "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-anthropic.srs",
         "update_interval": "12h",
-        "http_client": {
-          "engine": "go",
-          "version": 2,
-          "detour": "US"
-        }
+        "http_client": "http_client_US"
       },
       {
         "tag": "Gemini",
@@ -589,11 +573,7 @@
         "format": "binary",
         "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-google-gemini.srs",
         "update_interval": "12h",
-        "http_client": {
-          "engine": "go",
-          "version": 2,
-          "detour": "US"
-        }
+        "http_client": "http_client_US"
       },
       {
         "tag": "Microsoft",
@@ -601,11 +581,7 @@
         "format": "binary",
         "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-microsoft.srs",
         "update_interval": "12h",
-        "http_client": {
-          "engine": "go",
-          "version": 2,
-          "detour": "US"
-        }
+        "http_client": "http_client_US"
       },
       {
         "tag": "OpenAI",
@@ -613,11 +589,7 @@
         "format": "binary",
         "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-openai.srs",
         "update_interval": "12h",
-        "http_client": {
-          "engine": "go",
-          "version": 2,
-          "detour": "US"
-        }
+        "http_client": "http_client_US"
       },
       {
         "tag": "JetBrains",
@@ -625,11 +597,7 @@
         "format": "binary",
         "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-jetbrains-ai.srs",
         "update_interval": "12h",
-        "http_client": {
-          "engine": "go",
-          "version": 2,
-          "detour": "US"
-        }
+        "http_client": "http_client_US"
       },
       {
         "tag": "Meta",
@@ -637,11 +605,7 @@
         "format": "binary",
         "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-meta.srs",
         "update_interval": "12h",
-        "http_client": {
-          "engine": "go",
-          "version": 2,
-          "detour": "US"
-        }
+        "http_client": "http_client_US"
       },
       {
         "tag": "X",
@@ -649,11 +613,7 @@
         "format": "binary",
         "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-x.srs",
         "update_interval": "12h",
-        "http_client": {
-          "engine": "go",
-          "version": 2,
-          "detour": "US"
-        }
+        "http_client": "http_client_US"
       },
       {
         "tag": "Spotify",
@@ -661,11 +621,7 @@
         "format": "binary",
         "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-spotify.srs",
         "update_interval": "12h",
-        "http_client": {
-          "engine": "go",
-          "version": 2,
-          "detour": "US"
-        }
+        "http_client": "http_client_US"
       },
       {
         "tag": "Binance",
@@ -673,11 +629,7 @@
         "format": "binary",
         "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-binance.srs",
         "update_interval": "1h",
-        "http_client": {
-          "engine": "go",
-          "version": 2,
-          "detour": "US"
-        }
+        "http_client": "http_client_US"
       },
       {
         "tag": "Kraken",
@@ -685,11 +637,7 @@
         "format": "binary",
         "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-kraken.srs",
         "update_interval": "1h",
-        "http_client": {
-          "engine": "go",
-          "version": 2,
-          "detour": "US"
-        }
+        "http_client": "http_client_US"
       },
       {
         "tag": "N26",
@@ -697,11 +645,7 @@
         "format": "binary",
         "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-n26.srs",
         "update_interval": "1h",
-        "http_client": {
-          "engine": "go",
-          "version": 2,
-          "detour": "US"
-        }
+        "http_client": "http_client_US"
       },
       {
         "tag": "Bybit",
@@ -709,11 +653,7 @@
         "format": "binary",
         "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-bybit.srs",
         "update_interval": "1h",
-        "http_client": {
-          "engine": "go",
-          "version": 2,
-          "detour": "US"
-        }
+        "http_client": "http_client_US"
       },
       {
         "tag": "OKX",
@@ -721,11 +661,7 @@
         "format": "binary",
         "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-okx.srs",
         "update_interval": "1h",
-        "http_client": {
-          "engine": "go",
-          "version": 2,
-          "detour": "US"
-        }
+        "http_client": "http_client_US"
       },
       {
         "tag": "Wise",
@@ -733,11 +669,7 @@
         "format": "binary",
         "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-wise.srs",
         "update_interval": "1h",
-        "http_client": {
-          "engine": "go",
-          "version": 2,
-          "detour": "US"
-        }
+        "http_client": "http_client_US"
       },
       {
         "tag": "ifast",
@@ -745,15 +677,24 @@
         "format": "binary",
         "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-ifast.srs",
         "update_interval": "1h",
-        "http_client": {
-          "engine": "go",
-          "version": 2,
-          "detour": "US"
-        }
+        "http_client": "http_client_US"
       }
     ],
     "final": "FINAL",
     "default_domain_resolver": "local",
+    "default_http_client": "default",
     "auto_detect_interface": true
-  }
+  },
+  "http_clients": [
+    {
+      "tag": "default",
+      "version": 2,
+      "detour": "FINAL"
+    },
+    {
+      "tag": "http_client_US",
+      "version": 2,
+      "detour": "US"
+    }
+  ]
 }

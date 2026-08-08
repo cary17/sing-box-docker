@@ -15,11 +15,7 @@
         "enabled": true,
         "download_url": "https://github.com/SagerNet/sing-box-dashboard/archive/refs/heads/gh-pages.zip",
         "update_interval": "1d",
-        "http_client": {
-          "engine": "go",
-          "version": 2,
-          "detour": "US"
-        }
+        "http_client": "http_client_US"
       },
       "tls": {
         "enabled": false
