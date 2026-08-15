@@ -629,6 +629,12 @@ jobs:
       needs.check_versions.outputs.testing_need_build == 'true' &&
       (github.event_name != 'workflow_dispatch' || github.event.inputs.branch == 'both' || github.event.inputs.branch == 'testing')
     steps:
+      - name: Checkout Current Repo
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          path: repo-tools
+          ref: ${{ github.ref_name }}
+
       - name: 克隆上游代码
         id: source
         run: |
@@ -645,6 +651,12 @@ jobs:
           echo "source_commit=$(git -C src rev-parse HEAD)" >> "$GITHUB_OUTPUT"
           echo "dockerfile_sha256=$(sha256sum src/Dockerfile | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
           echo "代码克隆完成"
+
+      - name: 生成 eBPF Dockerfile
+        id: ebpf_dockerfile
+        run: |
+          repo-tools/scripts/prepare-ebpf-dockerfile.sh src/Dockerfile src/Dockerfile.ebpf
+          echo "sha256=$(sha256sum src/Dockerfile.ebpf | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
 
       - name: Setup QEMU
         uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3
@@ -670,7 +682,7 @@ jobs:
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
         with:
           context: src
-          file: src/Dockerfile
+          file: src/Dockerfile.ebpf
           platforms: linux/amd64,linux/arm64,linux/386,linux/arm/v7,linux/arm/v6
           push: true
           sbom: true
@@ -713,6 +725,14 @@ jobs:
             done
           done
 
+      - name: 校验测试版 eBPF 构建特性
+        run: |
+          VERSION_OUTPUT="$(docker run --rm --platform linux/amd64 \
+            "${{ env.GHCR_IMAGE }}:${{ needs.check_versions.outputs.testing_docker_tag }}" version)"
+          printf '%s\n' "$VERSION_OUTPUT"
+          sed -n 's/^Tags: //p' <<< "$VERSION_OUTPUT" | tr ',' '\n' | grep -Fx 'with_ebpf'
+          grep -Fx 'CGO: enabled' <<< "$VERSION_OUTPUT"
+
       - name: Checkout Current Repo
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -735,6 +755,7 @@ jobs:
             --arg source_branch "${{ env.UPSTREAM_TESTING_BRANCH }}" \
             --arg source_commit "${{ steps.source.outputs.source_commit }}" \
             --arg dockerfile_sha256 "${{ steps.source.outputs.dockerfile_sha256 }}" \
+            --arg ebpf_dockerfile_sha256 "${{ steps.ebpf_dockerfile.outputs.sha256 }}" \
             --arg ghcr_digest "${{ steps.build.outputs.digest }}" \
             --arg dockerhub_digest "${{ steps.build.outputs.digest }}" \
             '{
@@ -746,6 +767,7 @@ jobs:
               source_branch: $source_branch,
               source_commit: $source_commit,
               dockerfile_sha256: $dockerfile_sha256,
+              ebpf_dockerfile_sha256: $ebpf_dockerfile_sha256,
               ghcr_digest: $ghcr_digest,
               dockerhub_digest: $dockerhub_digest
             }' > "$FILE"
@@ -777,6 +799,7 @@ jobs:
           EXPECTED_SOURCE_BRANCH="${{ env.UPSTREAM_TESTING_BRANCH }}"
           EXPECTED_SOURCE_COMMIT="${{ steps.source.outputs.source_commit }}"
           EXPECTED_DOCKERFILE_SHA256="${{ steps.source.outputs.dockerfile_sha256 }}"
+          EXPECTED_EBPF_DOCKERFILE_SHA256="${{ steps.ebpf_dockerfile.outputs.sha256 }}"
           EXPECTED_DIGEST="${{ steps.build.outputs.digest }}"
           FILE=".github/version/testing.json"
 
@@ -791,6 +814,7 @@ jobs:
           ACTUAL_SOURCE_BRANCH=$(jq -r '.source_branch // ""' "$FILE")
           ACTUAL_SOURCE_COMMIT=$(jq -r '.source_commit // ""' "$FILE")
           ACTUAL_DOCKERFILE_SHA256=$(jq -r '.dockerfile_sha256 // ""' "$FILE")
+          ACTUAL_EBPF_DOCKERFILE_SHA256=$(jq -r '.ebpf_dockerfile_sha256 // ""' "$FILE")
           ACTUAL_GHCR_DIGEST=$(jq -r '.ghcr_digest // ""' "$FILE")
           ACTUAL_DOCKERHUB_DIGEST=$(jq -r '.dockerhub_digest // ""' "$FILE")
           if [[ "$ACTUAL" != "$EXPECTED" ]]; then
@@ -812,6 +836,7 @@ jobs:
           [[ "$ACTUAL_SOURCE_BRANCH" == "$EXPECTED_SOURCE_BRANCH" ]]
           [[ "$ACTUAL_SOURCE_COMMIT" == "$EXPECTED_SOURCE_COMMIT" ]]
           [[ "$ACTUAL_DOCKERFILE_SHA256" == "$EXPECTED_DOCKERFILE_SHA256" ]]
+          [[ "$ACTUAL_EBPF_DOCKERFILE_SHA256" == "$EXPECTED_EBPF_DOCKERFILE_SHA256" ]]
           [[ "$ACTUAL_GHCR_DIGEST" == "$EXPECTED_DIGEST" ]]
           [[ "$ACTUAL_DOCKERHUB_DIGEST" == "$EXPECTED_DIGEST" ]]
 
@@ -823,6 +848,7 @@ jobs:
           REMOTE_SOURCE_BRANCH=$(jq -r '.source_branch // ""' <<< "$REMOTE")
           REMOTE_SOURCE_COMMIT=$(jq -r '.source_commit // ""' <<< "$REMOTE")
           REMOTE_DOCKERFILE_SHA256=$(jq -r '.dockerfile_sha256 // ""' <<< "$REMOTE")
+          REMOTE_EBPF_DOCKERFILE_SHA256=$(jq -r '.ebpf_dockerfile_sha256 // ""' <<< "$REMOTE")
           REMOTE_GHCR_DIGEST=$(jq -r '.ghcr_digest // ""' <<< "$REMOTE")
           REMOTE_DOCKERHUB_DIGEST=$(jq -r '.dockerhub_digest // ""' <<< "$REMOTE")
           if [[ "$REMOTE_VERSION" != "$EXPECTED" ||
@@ -831,6 +857,7 @@ jobs:
                 "$REMOTE_SOURCE_BRANCH" != "$EXPECTED_SOURCE_BRANCH" ||
                 "$REMOTE_SOURCE_COMMIT" != "$EXPECTED_SOURCE_COMMIT" ||
                 "$REMOTE_DOCKERFILE_SHA256" != "$EXPECTED_DOCKERFILE_SHA256" ||
+                "$REMOTE_EBPF_DOCKERFILE_SHA256" != "$EXPECTED_EBPF_DOCKERFILE_SHA256" ||
                 "$REMOTE_GHCR_DIGEST" != "$EXPECTED_DIGEST" ||
                 "$REMOTE_DOCKERHUB_DIGEST" != "$EXPECTED_DIGEST" ]]; then
             echo "远端版本记录不正确"

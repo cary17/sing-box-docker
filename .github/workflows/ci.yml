@@ -38,10 +38,10 @@ jobs:
       - name: Validate shell scripts and project policy
         run: |
           actionlint .github/workflows/*.yml
-          shellcheck scripts/select-upstream-version.sh tests/*.sh
-          bash -n scripts/select-upstream-version.sh
-          bash -n tests/test-project.sh tests/test-select-version.sh tests/test-cleanup-policy.sh
+          shellcheck scripts/*.sh tests/*.sh
+          bash -n scripts/*.sh tests/*.sh
           tests/test-select-version.sh
           tests/test-cleanup-policy.sh
+          tests/test-prepare-ebpf-dockerfile.sh
           tests/test-project.sh
           docker compose config --quiet
