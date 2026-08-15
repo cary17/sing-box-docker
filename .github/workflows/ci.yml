@@ -43,5 +43,6 @@ jobs:
           tests/test-select-version.sh
           tests/test-cleanup-policy.sh
           tests/test-prepare-ebpf-dockerfile.sh
+          tests/test-merge-channel-manifests.sh
           tests/test-project.sh
           docker compose config --quiet
