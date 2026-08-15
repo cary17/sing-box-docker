@@ -87,10 +87,14 @@ assert_contains "$WORKFLOW" 'platforms: ${{ matrix.platform }}'
 assert_contains "$WORKFLOW" 'scope=stable-${{ matrix.slug }}'
 # shellcheck disable=SC2016
 assert_contains "$WORKFLOW" 'scope=testing-${{ matrix.slug }}'
+assert_contains "$WORKFLOW" 'push-by-digest=true'
+assert_contains "$WORKFLOW" 'actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02'
+assert_contains "$WORKFLOW" 'actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093'
 # shellcheck disable=SC2016
-assert_contains "$WORKFLOW" 'stable-build-${{ matrix.slug }}'
+assert_not_contains "$WORKFLOW" 'stable-build-${{ matrix.slug }}'
 # shellcheck disable=SC2016
-assert_contains "$WORKFLOW" 'testing-build-${{ matrix.slug }}'
+assert_not_contains "$WORKFLOW" 'testing-build-${{ matrix.slug }}'
+assert_contains "$WORKFLOW" 'source_version'
 
 # 用户要求保留从所选移动分支构建，并让 reF1nd 修订覆盖相同短 tag。
 assert_contains "$WORKFLOW" 'git clone --depth 1 --branch'

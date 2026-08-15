@@ -383,13 +383,17 @@ jobs:
     outputs:
       source_commit: ${{ steps.source.outputs.source_commit }}
       dockerfile_sha256: ${{ steps.source.outputs.dockerfile_sha256 }}
+      source_version: ${{ steps.source.outputs.source_version }}
     steps:
       - name: 固定上游源码
         id: source
         run: |
           git clone --depth 1 --branch "${{ env.UPSTREAM_STABLE_BRANCH }}" "${{ env.UPSTREAM_REPO }}" src
-          echo "source_commit=$(git -C src rev-parse HEAD)" >> "$GITHUB_OUTPUT"
-          echo "dockerfile_sha256=$(sha256sum src/Dockerfile | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+          {
+            echo "source_commit=$(git -C src rev-parse HEAD)"
+            echo "dockerfile_sha256=$(sha256sum src/Dockerfile | cut -d' ' -f1)"
+            echo "source_version=$(cd src && go run ./cmd/internal/read_tag)"
+          } >> "$GITHUB_OUTPUT"
 
   build_stable:
     name: 构建稳定版镜像 (${{ matrix.platform }})
@@ -417,21 +421,18 @@ jobs:
       (github.event_name != 'workflow_dispatch' || github.event.inputs.branch == 'both' || github.event.inputs.branch == 'stable')
     steps:
       - name: 克隆上游代码
-        env:
-          SOURCE_COMMIT: ${{ needs.prepare_stable.outputs.source_commit }}
         run: |
-          echo "检出固定上游提交 ${SOURCE_COMMIT}..."
+          echo "克隆并验证固定上游提交 ${{ needs.prepare_stable.outputs.source_commit }}..."
           for attempt in 1 2 3; do
             rm -rf src
-            git init src
-            if git -C src fetch --depth 1 "${{ env.UPSTREAM_REPO }}" "$SOURCE_COMMIT" &&
-              git -C src checkout --detach FETCH_HEAD; then
+            if git clone --depth 1 --branch "${{ env.UPSTREAM_STABLE_BRANCH }}" \
+              "${{ env.UPSTREAM_REPO }}" src; then
               break
             fi
             [[ "$attempt" -lt 3 ]] || exit 1
             sleep $((attempt * 2))
           done
-          [[ "$(git -C src rev-parse HEAD)" == "$SOURCE_COMMIT" ]]
+          [[ "$(git -C src rev-parse HEAD)" == "${{ needs.prepare_stable.outputs.source_commit }}" ]]
           [[ "$(sha256sum src/Dockerfile | cut -d' ' -f1)" == "${{ needs.prepare_stable.outputs.dockerfile_sha256 }}" ]]
           echo "代码克隆完成"
 
@@ -461,14 +462,24 @@ jobs:
           context: src
           file: src/Dockerfile
           platforms: ${{ matrix.platform }}
-          push: true
           sbom: true
           provenance: mode=max
           cache-from: type=gha,scope=stable-${{ matrix.slug }}
           cache-to: type=gha,mode=max,scope=stable-${{ matrix.slug }}
-          tags: |
-            ${{ env.GHCR_IMAGE }}:stable-build-${{ matrix.slug }}
-            ${{ env.DOCKERHUB_IMAGE }}:stable-build-${{ matrix.slug }}
+          outputs: |
+            type=image,name=${{ env.GHCR_IMAGE }},push-by-digest=true,name-canonical=true,push=true
+            type=image,name=${{ env.DOCKERHUB_IMAGE }},push-by-digest=true,name-canonical=true,push=true
+      - name: 保存稳定版单架构 digest
+        run: |
+          mkdir -p "$RUNNER_TEMP/digests"
+          printf '%s\n' '${{ steps.build.outputs.digest }}' > "$RUNNER_TEMP/digests/${{ matrix.slug }}"
+      - name: 上传稳定版 digest
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: stable-digest-${{ matrix.slug }}
+          path: ${{ runner.temp }}/digests/${{ matrix.slug }}
+          if-no-files-found: error
+          retention-days: 1
 
   # ==================== 构建测试版 ====================
   prepare_testing:
@@ -482,6 +493,7 @@ jobs:
       source_commit: ${{ steps.source.outputs.source_commit }}
       dockerfile_sha256: ${{ steps.source.outputs.dockerfile_sha256 }}
       ebpf_dockerfile_sha256: ${{ steps.ebpf.outputs.sha256 }}
+      source_version: ${{ steps.source.outputs.source_version }}
     steps:
       - name: Checkout Current Repo
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -492,8 +504,11 @@ jobs:
         id: source
         run: |
           git clone --depth 1 --branch "${{ env.UPSTREAM_TESTING_BRANCH }}" "${{ env.UPSTREAM_REPO }}" src
-          echo "source_commit=$(git -C src rev-parse HEAD)" >> "$GITHUB_OUTPUT"
-          echo "dockerfile_sha256=$(sha256sum src/Dockerfile | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+          {
+            echo "source_commit=$(git -C src rev-parse HEAD)"
+            echo "dockerfile_sha256=$(sha256sum src/Dockerfile | cut -d' ' -f1)"
+            echo "source_version=$(cd src && go run ./cmd/internal/read_tag)"
+          } >> "$GITHUB_OUTPUT"
       - name: 生成 eBPF Dockerfile 摘要
         id: ebpf
         run: |
@@ -532,21 +547,18 @@ jobs:
           ref: ${{ github.ref_name }}
 
       - name: 克隆上游代码
-        env:
-          SOURCE_COMMIT: ${{ needs.prepare_testing.outputs.source_commit }}
         run: |
-          echo "检出固定上游提交 ${SOURCE_COMMIT}..."
+          echo "克隆并验证固定上游提交 ${{ needs.prepare_testing.outputs.source_commit }}..."
           for attempt in 1 2 3; do
             rm -rf src
-            git init src
-            if git -C src fetch --depth 1 "${{ env.UPSTREAM_REPO }}" "$SOURCE_COMMIT" &&
-              git -C src checkout --detach FETCH_HEAD; then
+            if git clone --depth 1 --branch "${{ env.UPSTREAM_TESTING_BRANCH }}" \
+              "${{ env.UPSTREAM_REPO }}" src; then
               break
             fi
             [[ "$attempt" -lt 3 ]] || exit 1
             sleep $((attempt * 2))
           done
-          [[ "$(git -C src rev-parse HEAD)" == "$SOURCE_COMMIT" ]]
+          [[ "$(git -C src rev-parse HEAD)" == "${{ needs.prepare_testing.outputs.source_commit }}" ]]
           [[ "$(sha256sum src/Dockerfile | cut -d' ' -f1)" == "${{ needs.prepare_testing.outputs.dockerfile_sha256 }}" ]]
           echo "代码克隆完成"
 
@@ -581,14 +593,24 @@ jobs:
           context: src
           file: src/Dockerfile.ebpf
           platforms: ${{ matrix.platform }}
-          push: true
           sbom: true
           provenance: mode=max
           cache-from: type=gha,scope=testing-${{ matrix.slug }}
           cache-to: type=gha,mode=max,scope=testing-${{ matrix.slug }}
-          tags: |
-            ${{ env.GHCR_IMAGE }}:testing-build-${{ matrix.slug }}
-            ${{ env.DOCKERHUB_IMAGE }}:testing-build-${{ matrix.slug }}
+          outputs: |
+            type=image,name=${{ env.GHCR_IMAGE }},push-by-digest=true,name-canonical=true,push=true
+            type=image,name=${{ env.DOCKERHUB_IMAGE }},push-by-digest=true,name-canonical=true,push=true
+      - name: 保存测试版单架构 digest
+        run: |
+          mkdir -p "$RUNNER_TEMP/digests"
+          printf '%s\n' '${{ steps.build.outputs.digest }}' > "$RUNNER_TEMP/digests/${{ matrix.slug }}"
+      - name: 上传测试版 digest
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: testing-digest-${{ matrix.slug }}
+          path: ${{ runner.temp }}/digests/${{ matrix.slug }}
+          if-no-files-found: error
+          retention-days: 1
 
   merge_stable:
     name: 合并并发布稳定版镜像
@@ -617,12 +639,19 @@ jobs:
         with:
           username: cary17
           password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: 下载稳定版 digest
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          path: ${{ runner.temp }}/digests
+          pattern: stable-digest-*
+          merge-multiple: true
       - name: 合并并校验稳定版清单
         id: merge
         run: |
           scripts/merge-channel-manifests.sh stable \
             "${{ needs.check_versions.outputs.stable_docker_tag }}" \
-            "${{ env.GHCR_IMAGE }}" "${{ env.DOCKERHUB_IMAGE }}" "latest,stable"
+            "${{ env.GHCR_IMAGE }}" "${{ env.DOCKERHUB_IMAGE }}" "latest,stable" \
+            "$RUNNER_TEMP/digests"
       - name: 更新稳定版版本记录
         run: |
           scripts/update-version-record.sh stable \
@@ -664,17 +693,25 @@ jobs:
         with:
           username: cary17
           password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: 下载测试版 digest
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          path: ${{ runner.temp }}/digests
+          pattern: testing-digest-*
+          merge-multiple: true
       - name: 合并并校验测试版清单
         id: merge
         run: |
           scripts/merge-channel-manifests.sh testing \
             "${{ needs.check_versions.outputs.testing_docker_tag }}" \
-            "${{ env.GHCR_IMAGE }}" "${{ env.DOCKERHUB_IMAGE }}" "testing"
+            "${{ env.GHCR_IMAGE }}" "${{ env.DOCKERHUB_IMAGE }}" "testing" \
+            "$RUNNER_TEMP/digests"
       - name: 校验测试版 eBPF 构建特性
         run: |
           VERSION_OUTPUT="$(docker run --rm --platform linux/amd64 \
             "${{ env.GHCR_IMAGE }}:${{ needs.check_versions.outputs.testing_docker_tag }}" version)"
           printf '%s\n' "$VERSION_OUTPUT"
+          grep -Fx "sing-box version ${{ needs.prepare_testing.outputs.source_version }}" <<< "$VERSION_OUTPUT"
           sed -n 's/^Tags: //p' <<< "$VERSION_OUTPUT" | tr ',' '\n' | grep -Fx 'with_ebpf'
           grep -Fx 'CGO: enabled' <<< "$VERSION_OUTPUT"
       - name: 更新测试版版本记录

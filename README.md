@@ -33,7 +33,7 @@ cary17/sing-box:v1.14.0-beta.1          # 测试版特定基础版本
 - 工作流不会维护上游 Dockerfile 的完整副本。每次构建会严格检查上游关键构建行，生成临时 `Dockerfile.ebpf`；上游结构变化时立即失败，等待人工审查；
 - 构建完成后必须从镜像的 `sing-box version` 输出确认存在 `with_ebpf` 且显示 `CGO: enabled`，否则不会更新版本记录；
 - 版本记录同时保存原始上游 Dockerfile 和临时 eBPF Dockerfile 的 SHA-256。
-- Stable 与 Testing 均按五个平台拆成独立 GitHub Actions 矩阵任务并行构建；只有五个平台全部成功后才合并并覆盖最终标签。Stable 仍使用上游原始 Dockerfile，不启用 eBPF。
+- Stable 与 Testing 均按五个平台拆成独立 GitHub Actions 矩阵任务并行构建；单架构仅按 digest 上传镜像 blob，不创建临时标签，只有五个平台全部成功后才合并并覆盖最终标签。Stable 仍使用上游原始 Dockerfile，不启用 eBPF。
 
 ## 标签与构建语义
 

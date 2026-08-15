@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-CHANNEL="${1:?usage: merge-channel-manifests.sh <channel> <version-tag> <ghcr-image> <dockerhub-image> <aliases>}"
+CHANNEL="${1:?usage: merge-channel-manifests.sh <channel> <version-tag> <ghcr-image> <dockerhub-image> <aliases> <digest-dir>}"
 VERSION_TAG="${2:?missing version tag}"
 GHCR_IMAGE="${3:?missing GHCR image}"
 DOCKERHUB_IMAGE="${4:?missing Docker Hub image}"
 ALIASES="${5:?missing comma-separated aliases}"
+DIGEST_DIR="${6:?missing digest directory}"
+[[ "$CHANNEL" == stable || "$CHANNEL" == testing ]] || { echo "invalid channel: $CHANNEL" >&2; exit 1; }
 
 SLUGS=(amd64 arm64 386 arm-v7 arm-v6)
 EXPECTED_PLATFORMS=(linux/amd64 linux/arm64 linux/386 linux/arm/v7 linux/arm/v6)
@@ -13,10 +15,13 @@ EXPECTED_PLATFORMS=(linux/amd64 linux/arm64 linux/386 linux/arm/v7 linux/arm/v6)
 merge_registry() {
   local image="$1"
   local -a sources tags
-  local alias manifest actual platform
+  local alias digest manifest actual platform
 
   for alias in "${SLUGS[@]}"; do
-    sources+=("${image}:${CHANNEL}-build-${alias}")
+    [[ -f "$DIGEST_DIR/$alias" ]] || { echo "missing digest: $alias" >&2; exit 1; }
+    digest="$(<"$DIGEST_DIR/$alias")"
+    [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]] || { echo "invalid digest: $alias" >&2; exit 1; }
+    sources+=("${image}@${digest}")
   done
   tags=(-t "${image}:${VERSION_TAG}")
   IFS=',' read -ra alias_list <<< "$ALIASES"
