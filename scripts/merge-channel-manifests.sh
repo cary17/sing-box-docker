@@ -14,13 +14,14 @@ EXPECTED_PLATFORMS=(linux/amd64 linux/arm64 linux/386 linux/arm/v7 linux/arm/v6)
 
 merge_registry() {
   local image="$1"
+  local prefix="$2"
   local -a sources tags
   local alias digest manifest actual platform
 
   for alias in "${SLUGS[@]}"; do
-    [[ -f "$DIGEST_DIR/$alias" ]] || { echo "missing digest: $alias" >&2; exit 1; }
-    digest="$(<"$DIGEST_DIR/$alias")"
-    [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]] || { echo "invalid digest: $alias" >&2; exit 1; }
+    [[ -f "$DIGEST_DIR/$prefix-$alias" ]] || { echo "missing digest: $prefix-$alias" >&2; exit 1; }
+    digest="$(<"$DIGEST_DIR/$prefix-$alias")"
+    [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]] || { echo "invalid digest: $prefix-$alias" >&2; exit 1; }
     sources+=("${image}@${digest}")
   done
   tags=(-t "${image}:${VERSION_TAG}")
@@ -43,7 +44,7 @@ merge_registry() {
   jq -r '.digest' <<< "$manifest"
 }
 
-GHCR_DIGEST="$(merge_registry "$GHCR_IMAGE")"
-DOCKERHUB_DIGEST="$(merge_registry "$DOCKERHUB_IMAGE")"
+GHCR_DIGEST="$(merge_registry "$GHCR_IMAGE" ghcr)"
+DOCKERHUB_DIGEST="$(merge_registry "$DOCKERHUB_IMAGE" dockerhub)"
 printf 'ghcr_digest=%s\ndockerhub_digest=%s\n' "$GHCR_DIGEST" "$DOCKERHUB_DIGEST" >> "$GITHUB_OUTPUT"
 printf 'GHCR digest: %s\nDocker Hub digest: %s\n' "$GHCR_DIGEST" "$DOCKERHUB_DIGEST"

@@ -455,8 +455,8 @@ jobs:
           username: cary17
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: 构建并推送稳定版单架构镜像
-        id: build
+      - name: 构建并推送稳定版单架构镜像到 GHCR
+        id: build_ghcr
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
         with:
           context: src
@@ -466,18 +466,28 @@ jobs:
           provenance: mode=max
           cache-from: type=gha,scope=stable-${{ matrix.slug }}
           cache-to: type=gha,mode=max,scope=stable-${{ matrix.slug }}
-          outputs: |
-            type=image,name=${{ env.GHCR_IMAGE }},push-by-digest=true,name-canonical=true,push=true
-            type=image,name=${{ env.DOCKERHUB_IMAGE }},push-by-digest=true,name-canonical=true,push=true
+          outputs: type=image,name=${{ env.GHCR_IMAGE }},push-by-digest=true,name-canonical=true,push=true
+      - name: 构建并推送稳定版单架构镜像到 Docker Hub
+        id: build_dockerhub
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        with:
+          context: src
+          file: src/Dockerfile
+          platforms: ${{ matrix.platform }}
+          sbom: true
+          provenance: mode=max
+          cache-from: type=gha,scope=stable-${{ matrix.slug }}
+          outputs: type=image,name=${{ env.DOCKERHUB_IMAGE }},push-by-digest=true,name-canonical=true,push=true
       - name: 保存稳定版单架构 digest
         run: |
           mkdir -p "$RUNNER_TEMP/digests"
-          printf '%s\n' '${{ steps.build.outputs.digest }}' > "$RUNNER_TEMP/digests/${{ matrix.slug }}"
+          printf '%s\n' '${{ steps.build_ghcr.outputs.digest }}' > "$RUNNER_TEMP/digests/ghcr-${{ matrix.slug }}"
+          printf '%s\n' '${{ steps.build_dockerhub.outputs.digest }}' > "$RUNNER_TEMP/digests/dockerhub-${{ matrix.slug }}"
       - name: 上传稳定版 digest
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: stable-digest-${{ matrix.slug }}
-          path: ${{ runner.temp }}/digests/${{ matrix.slug }}
+          path: ${{ runner.temp }}/digests/*-${{ matrix.slug }}
           if-no-files-found: error
           retention-days: 1
 
@@ -586,8 +596,8 @@ jobs:
           username: cary17
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: 构建并推送测试版单架构镜像
-        id: build
+      - name: 构建并推送测试版单架构镜像到 GHCR
+        id: build_ghcr
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
         with:
           context: src
@@ -597,18 +607,28 @@ jobs:
           provenance: mode=max
           cache-from: type=gha,scope=testing-${{ matrix.slug }}
           cache-to: type=gha,mode=max,scope=testing-${{ matrix.slug }}
-          outputs: |
-            type=image,name=${{ env.GHCR_IMAGE }},push-by-digest=true,name-canonical=true,push=true
-            type=image,name=${{ env.DOCKERHUB_IMAGE }},push-by-digest=true,name-canonical=true,push=true
+          outputs: type=image,name=${{ env.GHCR_IMAGE }},push-by-digest=true,name-canonical=true,push=true
+      - name: 构建并推送测试版单架构镜像到 Docker Hub
+        id: build_dockerhub
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        with:
+          context: src
+          file: src/Dockerfile.ebpf
+          platforms: ${{ matrix.platform }}
+          sbom: true
+          provenance: mode=max
+          cache-from: type=gha,scope=testing-${{ matrix.slug }}
+          outputs: type=image,name=${{ env.DOCKERHUB_IMAGE }},push-by-digest=true,name-canonical=true,push=true
       - name: 保存测试版单架构 digest
         run: |
           mkdir -p "$RUNNER_TEMP/digests"
-          printf '%s\n' '${{ steps.build.outputs.digest }}' > "$RUNNER_TEMP/digests/${{ matrix.slug }}"
+          printf '%s\n' '${{ steps.build_ghcr.outputs.digest }}' > "$RUNNER_TEMP/digests/ghcr-${{ matrix.slug }}"
+          printf '%s\n' '${{ steps.build_dockerhub.outputs.digest }}' > "$RUNNER_TEMP/digests/dockerhub-${{ matrix.slug }}"
       - name: 上传测试版 digest
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: testing-digest-${{ matrix.slug }}
-          path: ${{ runner.temp }}/digests/${{ matrix.slug }}
+          path: ${{ runner.temp }}/digests/*-${{ matrix.slug }}
           if-no-files-found: error
           retention-days: 1
 

@@ -26,20 +26,23 @@ chmod +x "$TMP/docker"
 export PATH="$TMP:$PATH"
 export MOCK_LOG="$TMP/docker.log"
 export GITHUB_OUTPUT="$TMP/output"
-DIGEST='sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+GHCR_DIGEST='sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+DOCKERHUB_DIGEST='sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'
 mkdir "$TMP/digests"
 for slug in amd64 arm64 386 arm-v7 arm-v6; do
-  printf '%s\n' "$DIGEST" > "$TMP/digests/$slug"
+  printf '%s\n' "$GHCR_DIGEST" > "$TMP/digests/ghcr-$slug"
+  printf '%s\n' "$DOCKERHUB_DIGEST" > "$TMP/digests/dockerhub-$slug"
 done
 
 "$ROOT/scripts/merge-channel-manifests.sh" stable v1.2.3 ghcr.test/sing-box docker.test/sing-box latest,stable "$TMP/digests" >/dev/null
 
-grep -Fq "ghcr.test/sing-box@$DIGEST" "$MOCK_LOG"
+grep -Fq "ghcr.test/sing-box@$GHCR_DIGEST" "$MOCK_LOG"
+grep -Fq "docker.test/sing-box@$DOCKERHUB_DIGEST" "$MOCK_LOG"
 grep -Fq -- '-t ghcr.test/sing-box:v1.2.3 -t ghcr.test/sing-box:latest -t ghcr.test/sing-box:stable' "$MOCK_LOG"
 grep -Fx 'ghcr_digest=sha256:test' "$GITHUB_OUTPUT"
 grep -Fx 'dockerhub_digest=sha256:test' "$GITHUB_OUTPUT"
 
-rm "$TMP/digests/arm-v6"
+rm "$TMP/digests/ghcr-arm-v6"
 if "$ROOT/scripts/merge-channel-manifests.sh" stable v1.2.3 ghcr.test/sing-box docker.test/sing-box latest,stable "$TMP/digests" >/dev/null 2>&1; then
   echo 'missing digest unexpectedly passed' >&2
   exit 1
