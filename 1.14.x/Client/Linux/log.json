@@ -3,6 +3,7 @@
   "log": {
     "disabled": false,
     "level": "info",
+    "output": "/etc/sing-box/sing-box.log",
     "timestamp": true
   }
 }

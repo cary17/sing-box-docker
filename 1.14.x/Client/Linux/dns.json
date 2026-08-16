@@ -21,10 +21,6 @@
     ],
     "rules": [
       {
-        "inbound": "tun-in",
-        "server": "resolved-in"
-      },
-      {
         "domain_suffix": [
           "msftncsi.com",
           "msftconnecttest.com"
