@@ -27,7 +27,7 @@ DOCKERFILE
 bash "$SCRIPT" "$TMP/Dockerfile" "$TMP/Dockerfile.ebpf" >/dev/null
 # These are literal Dockerfile lines; shell expansion would invalidate the test.
 # shellcheck disable=SC1003,SC2016
-grep -Fqx 'FROM --platform=$BUILDPLATFORM ubuntu:24.04@sha256:561618e2c15bf2397621dd04f96926663a3b5616c189cf7e38db7e82f5c538ea AS ebpf-builder' "$TMP/Dockerfile.ebpf"
+grep -Fqx 'FROM --platform=$BUILDPLATFORM ubuntu:26.04@sha256:678c6550cc43645e08669028bc177f50be4e7c5b8cca677067b1914d4afc7a03 AS ebpf-builder' "$TMP/Dockerfile.ebpf"
 grep -Fqx 'COPY common/ebpf /src/common/ebpf' "$TMP/Dockerfile.ebpf"
 grep -Fqx 'RUN apt-get update \' "$TMP/Dockerfile.ebpf"
 grep -Fqx '    && apt-get install -y --no-install-recommends clang make gcc libc6-dev linux-libc-dev \' "$TMP/Dockerfile.ebpf"

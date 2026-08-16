@@ -29,7 +29,7 @@ cary17/sing-box:v1.14.0-beta.1          # 测试版特定基础版本
 ## eBPF 构建状态
 
 - `testing` 镜像基于 sing-box 1.14 分支，使用 `CGO_ENABLED=1` 和 `with_ebpf` 构建；
-- eBPF 的架构无关 `bpfel` 对象由 Ubuntu 24.04 Clang 单独生成并复制进 Alpine builder；Go/CGO 编译和最终运行镜像仍使用 Alpine；
+- eBPF 的架构无关 `bpfel` 对象由上游 Linux 发行流程同款 Ubuntu 26.04 Clang 单独生成并复制进 Alpine builder；Go/CGO 编译和最终运行镜像仍使用 Alpine；
 - `stable` 当前仍基于不含 eBPF 入站的 sing-box 1.13 分支，继续使用上游默认构建；
 - 工作流不会维护上游 Dockerfile 的完整副本。每次构建会严格检查上游关键构建行，生成临时 `Dockerfile.ebpf`；上游结构变化时立即失败，等待人工审查；
 - 构建完成后必须从镜像的 `sing-box version` 输出确认存在 `with_ebpf` 且显示 `CGO: enabled`，否则不会更新版本记录；

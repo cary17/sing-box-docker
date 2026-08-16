@@ -23,7 +23,7 @@ dist_count=0
 while IFS= read -r line || [[ -n "$line" ]]; do
   case "$line" in
     'FROM --platform=$BUILDPLATFORM '*" AS builder")
-      printf '%s\n' 'FROM --platform=$BUILDPLATFORM ubuntu:24.04@sha256:561618e2c15bf2397621dd04f96926663a3b5616c189cf7e38db7e82f5c538ea AS ebpf-builder' >> "$TEMP"
+      printf '%s\n' 'FROM --platform=$BUILDPLATFORM ubuntu:26.04@sha256:678c6550cc43645e08669028bc177f50be4e7c5b8cca677067b1914d4afc7a03 AS ebpf-builder' >> "$TEMP"
       printf '%s\n' 'COPY common/ebpf /src/common/ebpf' >> "$TEMP"
       printf '%s\n' 'WORKDIR /src' >> "$TEMP"
       printf '%s\n' 'RUN apt-get update \' >> "$TEMP"
@@ -89,7 +89,7 @@ for check in \
 done
 
 grep -Fqx 'ENV CGO_ENABLED=1' "$TEMP"
-grep -Fqx 'FROM --platform=$BUILDPLATFORM ubuntu:24.04@sha256:561618e2c15bf2397621dd04f96926663a3b5616c189cf7e38db7e82f5c538ea AS ebpf-builder' "$TEMP"
+grep -Fqx 'FROM --platform=$BUILDPLATFORM ubuntu:26.04@sha256:678c6550cc43645e08669028bc177f50be4e7c5b8cca677067b1914d4afc7a03 AS ebpf-builder' "$TEMP"
 grep -Fqx 'COPY --from=ebpf-builder /src/common/ebpf/native/cgroup.bpf.o common/ebpf/native/cgroup.bpf.o' "$TEMP"
 grep -Fqx 'COPY --from=ebpf-builder /src/common/ebpf/native/shared_network.bpf.o common/ebpf/native/shared_network.bpf.o' "$TEMP"
 grep -Fq 'with_ebpf' "$TEMP"
