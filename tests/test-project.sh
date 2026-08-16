@@ -5,6 +5,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 WORKFLOW="$ROOT/.github/workflows/build.yml"
 CI="$ROOT/.github/workflows/ci.yml"
 COMPOSE="$ROOT/docker-compose.yml"
+EBPF_COMPOSE="$ROOT/docker-compose.ebpf.yml"
 CLEANUP="$ROOT/.github/workflows/cleanup-workflow-runs.yml"
 README="$ROOT/README.md"
 
@@ -104,18 +105,34 @@ assert_contains "$WORKFLOW" 'testing_docker_tag'
 # shellcheck disable=SC2016
 assert_contains "$ROOT/scripts/select-upstream-version.sh" 'docker_tag="${version%%-reF1nd*}"'
 
-# Compose 默认使用最小权限，不再 privileged + ALL。
+# TUN Compose 只保留 TUN 所需权限。
 assert_not_contains "$COMPOSE" 'privileged: true'
 assert_not_contains "$COMPOSE" '      - ALL'
 assert_contains "$COMPOSE" '      - NET_ADMIN'
-assert_contains "$COMPOSE" '      - NET_RAW'
-assert_contains "$COMPOSE" '      - BPF'
-assert_contains "$COMPOSE" '      - IPC_LOCK'
-assert_contains "$COMPOSE" '    cgroup: host'
-assert_contains "$COMPOSE" '      memlock:'
-assert_contains "$COMPOSE" '        hard: -1'
+assert_contains "$COMPOSE" '/dev/net/tun:/dev/net/tun'
+assert_not_contains "$COMPOSE" '      - BPF'
+assert_not_contains "$COMPOSE" '      - PERFMON'
+assert_not_contains "$COMPOSE" '      - IPC_LOCK'
+assert_not_contains "$COMPOSE" '      - NET_RAW'
+assert_not_contains "$COMPOSE" '    cgroup: host'
 assert_contains "$COMPOSE" 'no-new-privileges:true'
 assert_contains "$COMPOSE" 'restart: unless-stopped'
+
+# eBPF Compose 只保留实测需要的 eBPF 权限，不挂载 TUN。
+assert_not_contains "$EBPF_COMPOSE" 'privileged: true'
+assert_not_contains "$EBPF_COMPOSE" '      - ALL'
+assert_not_contains "$EBPF_COMPOSE" '      - SYS_ADMIN'
+assert_not_contains "$EBPF_COMPOSE" '      - NET_RAW'
+assert_not_contains "$EBPF_COMPOSE" '      - IPC_LOCK'
+assert_not_contains "$EBPF_COMPOSE" '/dev/net/tun:/dev/net/tun'
+assert_contains "$EBPF_COMPOSE" '      - NET_ADMIN'
+assert_contains "$EBPF_COMPOSE" '      - BPF'
+assert_contains "$EBPF_COMPOSE" '      - PERFMON'
+assert_contains "$EBPF_COMPOSE" '    cgroup: host'
+assert_contains "$EBPF_COMPOSE" '      memlock:'
+assert_contains "$EBPF_COMPOSE" '        hard: -1'
+assert_contains "$EBPF_COMPOSE" 'no-new-privileges:true'
+assert_contains "$EBPF_COMPOSE" 'restart: unless-stopped'
 
 # 清理仅针对已完成且超过保留期的运行，并保留最近一批记录。
 assert_contains "$CLEANUP" 'set -euo pipefail'
@@ -136,6 +153,7 @@ assert_contains "$CI" 'actionlint .github/workflows/*.yml'
 assert_contains "$CI" 'sha256sum -c -'
 assert_not_contains "$CI" 'actions/checkout@v4'
 assert_contains "$CI" 'docker compose config --quiet'
+assert_contains "$CI" 'docker compose -f docker-compose.ebpf.yml config --quiet'
 
 # README 必须说明权限、版本标签覆盖语义和校验方式。
 assert_contains "$README" 'NET_ADMIN'

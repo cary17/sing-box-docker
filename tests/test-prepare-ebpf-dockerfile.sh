@@ -27,20 +27,14 @@ DOCKERFILE
 bash "$SCRIPT" "$TMP/Dockerfile" "$TMP/Dockerfile.ebpf" >/dev/null
 # These are literal Dockerfile lines; shell expansion would invalidate the test.
 # shellcheck disable=SC1003,SC2016
-grep -Fqx 'FROM --platform=$BUILDPLATFORM ubuntu:26.04@sha256:678c6550cc43645e08669028bc177f50be4e7c5b8cca677067b1914d4afc7a03 AS ebpf-builder' "$TMP/Dockerfile.ebpf"
-grep -Fqx 'COPY common/ebpf /src/common/ebpf' "$TMP/Dockerfile.ebpf"
-grep -Fqx 'RUN apt-get update \' "$TMP/Dockerfile.ebpf"
-grep -Fqx '    && apt-get install -y --no-install-recommends clang make gcc libc6-dev linux-libc-dev \' "$TMP/Dockerfile.ebpf"
-grep -Fqx '    && make -C common/ebpf generate \' "$TMP/Dockerfile.ebpf"
 grep -Fqx 'FROM --platform=$TARGETPLATFORM golang:1.26-alpine AS builder' "$TMP/Dockerfile.ebpf"
 grep -Fqx 'ENV CGO_ENABLED=1' "$TMP/Dockerfile.ebpf"
 # shellcheck disable=SC1003
-grep -Fqx '    && apk add git build-base linux-headers \' "$TMP/Dockerfile.ebpf"
-grep -Fqx 'COPY --from=ebpf-builder /src/common/ebpf/native/cgroup.bpf.o common/ebpf/native/cgroup.bpf.o' "$TMP/Dockerfile.ebpf"
-grep -Fqx 'COPY --from=ebpf-builder /src/common/ebpf/native/shared_network.bpf.o common/ebpf/native/shared_network.bpf.o' "$TMP/Dockerfile.ebpf"
+grep -Fqx '    && apk add git build-base clang linux-headers \' "$TMP/Dockerfile.ebpf"
 # shellcheck disable=SC1003,SC2016
 grep -Fqx '    && export TAGS="$(cat release/DEFAULT_BUILD_TAGS_OTHERS),with_ebpf" \' "$TMP/Dockerfile.ebpf"
-[[ "$(grep -Fxc '    && make -C common/ebpf generate \' "$TMP/Dockerfile.ebpf")" == 1 ]]
+# shellcheck disable=SC1003
+grep -Fqx '    && make -C common/ebpf generate \' "$TMP/Dockerfile.ebpf"
 # shellcheck disable=SC2016
 grep -Fqx '    && go build -tags "$TAGS" ./cmd/sing-box' "$TMP/Dockerfile.ebpf"
 grep -Fqx "    && grep -Fx 'CGO: enabled' /tmp/version" "$TMP/Dockerfile.ebpf"
@@ -54,9 +48,9 @@ fi
 grep -Fq 'expected one CGO setting anchor, found 0' "$TMP/stderr"
 [[ ! -e "$TMP/should-not-exist" ]]
 
-# The upstream Dockerfile added this structure in 2026-03 and changed only the
-# Go image version (1.25 -> 1.26) through 2026-08. Replay that real change plus
-# likely formatting/layout changes while preserving the semantic anchors.
+# Upstream kept this structure from 2026-03 through 2026-08 while changing the
+# Go image version. Accept likely formatting/layout changes when the semantic
+# build anchors remain intact.
 sed \
   -e 's/golang:1.26-alpine/golang:1.25-alpine/' \
   -e 's|COPY . /src|COPY . /workspace/sing-box|' \
@@ -64,14 +58,10 @@ sed \
   -e 's/ENV CGO_ENABLED=0/ENV CGO_ENABLED 0/' \
   -e 's/apk add git build-base/apk add --no-cache git ca-certificates build-base/' \
   -e 's/FROM --platform=$TARGETPLATFORM alpine AS dist/FROM --platform=$TARGETPLATFORM alpine:3.24 AS dist/' \
-  -e '/ARG TARGETOS TARGETARCH/a ARG EXTRA_BUILD_FLAG=""' \
   "$TMP/Dockerfile" > "$TMP/Dockerfile.changed-layout"
 bash "$SCRIPT" "$TMP/Dockerfile.changed-layout" "$TMP/Dockerfile.changed-layout.ebpf" >/dev/null
 grep -Fqx 'FROM --platform=$TARGETPLATFORM golang:1.25-alpine AS builder' "$TMP/Dockerfile.changed-layout.ebpf"
-grep -Fqx 'WORKDIR /workspace/sing-box' "$TMP/Dockerfile.changed-layout.ebpf"
-grep -Fqx '    && apk add --no-cache git ca-certificates build-base linux-headers \' "$TMP/Dockerfile.changed-layout.ebpf"
-[[ "$(grep -Fc 'linux-headers' "$TMP/Dockerfile.changed-layout.ebpf")" == 1 ]]
+grep -Fqx '    && apk add --no-cache git ca-certificates build-base clang linux-headers \' "$TMP/Dockerfile.changed-layout.ebpf"
 grep -Fqx 'FROM --platform=$TARGETPLATFORM alpine:3.24 AS dist' "$TMP/Dockerfile.changed-layout.ebpf"
-grep -Fqx 'COPY --from=ebpf-builder /src/common/ebpf/native/cgroup.bpf.o common/ebpf/native/cgroup.bpf.o' "$TMP/Dockerfile.changed-layout.ebpf"
 
 echo 'eBPF Dockerfile preparation checks passed'

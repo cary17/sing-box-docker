@@ -46,3 +46,4 @@ jobs:
           tests/test-merge-channel-manifests.sh
           tests/test-project.sh
           docker compose config --quiet
+          docker compose -f docker-compose.ebpf.yml config --quiet

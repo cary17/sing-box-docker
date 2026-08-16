@@ -1,18 +1,22 @@
 services:
   sing-box:
-    #image: cary17/sing-box:latest
-    image: ghcr.io/cary17/sing-box:latest
+    image: ghcr.io/cary17/sing-box:testing
     container_name: sing-box
     restart: unless-stopped
     network_mode: "host"
+    cgroup: host
     environment:
       TZ: Asia/Shanghai
     cap_add:
+      - BPF
       - NET_ADMIN
+      - PERFMON
     security_opt:
       - no-new-privileges:true
-    devices:
-      - /dev/net/tun:/dev/net/tun
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
     volumes:
       - /opt/sing-box/conf:/etc/sing-box/
       - /run/dbus:/run/dbus:ro

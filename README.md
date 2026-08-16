@@ -29,7 +29,6 @@ cary17/sing-box:v1.14.0-beta.1          # 测试版特定基础版本
 ## eBPF 构建状态
 
 - `testing` 镜像基于 sing-box 1.14 分支，使用 `CGO_ENABLED=1` 和 `with_ebpf` 构建；
-- eBPF 的架构无关 `bpfel` 对象由上游 Linux 发行流程同款 Ubuntu 26.04 Clang 单独生成并复制进 Alpine builder；Go/CGO 编译和最终运行镜像仍使用 Alpine；
 - `stable` 当前仍基于不含 eBPF 入站的 sing-box 1.13 分支，继续使用上游默认构建；
 - 工作流不会维护上游 Dockerfile 的完整副本。每次构建会严格检查上游关键构建行，生成临时 `Dockerfile.ebpf`；上游结构变化时立即失败，等待人工审查；
 - 构建完成后必须从镜像的 `sing-box version` 输出确认存在 `with_ebpf` 且显示 `CGO: enabled`，否则不会更新版本记录；
@@ -91,27 +90,27 @@ image: ghcr.io/cary17/sing-box@sha256:<manifest-digest>
 
 摘要可直接从镜像仓库查询。仓库中的 `.github/version/stable.json`、`.github/version/testing.json` 会在采用新版工作流成功构建后补充摘要及源码追溯字段；现有历史记录在下一次成功构建前可能仍只有旧字段。
 
-## 权限说明
+## Compose 与权限
 
-Compose 为 TUN、路由及透明代理场景保留以下权限：
-
-- `network_mode: host`：容器直接使用宿主机网络；
-- `NET_ADMIN`：管理路由、TUN 和相关网络规则；
-- `NET_RAW`：支持可能需要 raw socket 的网络功能；
-- `BPF`：加载和管理 eBPF 程序及 map；
-- `IPC_LOCK`：允许锁定 eBPF map 所需内存；
-- `memlock: -1`：解除容器默认锁定内存上限，避免较大 eBPF map 因 `EPERM` 或 `ENOMEM` 加载失败；
-- `cgroup: host`：让容器访问宿主机 cgroup v2 层级；
-- `/dev/net/tun`：提供 TUN 设备；
-- `no-new-privileges:true`：阻止进程通过 `execve` 获得额外权限。
-
-默认配置不再使用 `privileged: true` 或 `cap_add: ALL`。由于启用了 host 网络并拥有网络管理能力，仍应只运行可信镜像和可信配置。如果部署不使用 TUN、TProxy、路由或 raw socket，可在实际验证后继续移除不需要的 capability 或设备映射。
-
-使用 eBPF 入站前，先切换到 testing 镜像并探测目标内核能力：
+默认 `docker-compose.yml` 用于 TUN，只保留 `NET_ADMIN` 和 `/dev/net/tun`：
 
 ```bash
-docker compose exec sing-box sing-box version
-docker compose exec sing-box sing-box tools ebpf status --mode local
+docker compose up -d
+```
+
+`docker-compose.ebpf.yml` 用于 eBPF，不挂载 TUN，也不授予 `NET_RAW`：
+
+```bash
+docker compose -f docker-compose.ebpf.yml up -d
+```
+
+eBPF Compose 使用实测最小集合 `BPF`、`PERFMON`、`NET_ADMIN`、host cgroup 和无限 memlock。`PERFMON` 缺失时，内核可能以 `permission denied` 拒绝程序，并输出误导性的 `attempt to corrupt spilled pointer on stack`；缺少 `NET_ADMIN` 时 socket release probe 会返回 `operation not permitted`。
+
+两套 Compose 都使用 host 网络和 `no-new-privileges:true`，均不使用 `privileged: true`、`cap_add: ALL` 或 `SYS_ADMIN`。使用 eBPF 入站前先探测目标内核能力：
+
+```bash
+docker compose -f docker-compose.ebpf.yml exec sing-box sing-box version
+docker compose -f docker-compose.ebpf.yml exec sing-box sing-box tools ebpf status --mode local
 ```
 
 第一条命令必须显示 `with_ebpf` 和 `CGO: enabled`。第二条命令的实际加载结果才是兼容性依据，不能只按内核版本推断。探测失败时保留原 TUN 配置并回退到 `stable` 或先前固定的镜像摘要；不要在未验证的主机上直接替换现有透明代理入站。
@@ -163,6 +162,7 @@ actionlint .github/workflows/*.yml
 shellcheck scripts/select-upstream-version.sh tests/*.sh
 bash -n scripts/select-upstream-version.sh tests/test-select-version.sh tests/test-cleanup-policy.sh tests/test-project.sh
 docker compose config --quiet
+docker compose -f docker-compose.ebpf.yml config --quiet
 ```
 
 独立 CI 会在脚本、测试、Compose、README 或工作流变更时执行这些检查。
