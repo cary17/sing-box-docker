@@ -28,10 +28,10 @@ cary17/sing-box:v1.14.0-beta.1          # 测试版特定基础版本
 
 ## eBPF 构建状态
 
-- `testing` 镜像基于 sing-box 1.14 分支，使用 `CGO_ENABLED=1` 和 `with_ebpf` 构建；
+- `testing` 镜像基于 sing-box 1.14 分支，使用 `CGO_ENABLED=0` 和 `with_ebpf` 构建（纯 Go cilium/ebpf，预编译 BPF 对象已提交上游）；
 - `stable` 当前仍基于不含 eBPF 入站的 sing-box 1.13 分支，继续使用上游默认构建；
 - 工作流不会维护上游 Dockerfile 的完整副本。每次构建会严格检查上游关键构建行，生成临时 `Dockerfile.ebpf`；上游结构变化时立即失败，等待人工审查；
-- 构建完成后必须从镜像的 `sing-box version` 输出确认存在 `with_ebpf` 且显示 `CGO: enabled`，否则不会更新版本记录；
+- 构建完成后必须从镜像的 `sing-box version` 输出确认存在 `with_ebpf` 且显示 `CGO: disabled`，否则不会更新版本记录；
 - 版本记录同时保存原始上游 Dockerfile 和临时 eBPF Dockerfile 的 SHA-256。
 - Stable 与 Testing 均按五个平台拆成独立 GitHub Actions 矩阵任务并行构建；单架构仅按 digest 上传镜像 blob，不创建临时标签，只有五个平台全部成功后才合并并覆盖最终标签。Stable 仍使用上游原始 Dockerfile，不启用 eBPF。
 
@@ -113,7 +113,7 @@ docker compose -f docker-compose.ebpf.yml exec sing-box sing-box version
 docker compose -f docker-compose.ebpf.yml exec sing-box sing-box tools ebpf status --mode local
 ```
 
-第一条命令必须显示 `with_ebpf` 和 `CGO: enabled`。第二条命令的实际加载结果才是兼容性依据，不能只按内核版本推断。探测失败时保留原 TUN 配置并回退到 `stable` 或先前固定的镜像摘要；不要在未验证的主机上直接替换现有透明代理入站。
+第一条命令必须显示 `with_ebpf` 和 `CGO: disabled`。第二条命令的实际加载结果才是兼容性依据，不能只按内核版本推断。探测失败时保留原 TUN 配置并回退到 `stable` 或先前固定的镜像摘要；不要在未验证的主机上直接替换现有透明代理入站。
 
 ## 构建与供应链记录
 

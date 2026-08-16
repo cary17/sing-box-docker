@@ -72,11 +72,11 @@ assert_contains "$WORKFLOW" 'scripts/prepare-ebpf-dockerfile.sh'
 assert_contains "$WORKFLOW" 'file: src/Dockerfile.ebpf'
 assert_contains "$WORKFLOW" 'ebpf_dockerfile_sha256'
 assert_contains "$WORKFLOW" "grep -Fx 'with_ebpf'"
-assert_contains "$WORKFLOW" "grep -Fx 'CGO: enabled'"
+assert_contains "$WORKFLOW" "grep -Fx 'CGO: disabled'"
 # shellcheck disable=SC2016
 assert_contains "$ROOT/scripts/prepare-ebpf-dockerfile.sh" 'FROM --platform=$BUILDPLATFORM'
-assert_contains "$ROOT/scripts/prepare-ebpf-dockerfile.sh" 'ENV CGO_ENABLED=0'
-assert_contains "$ROOT/scripts/prepare-ebpf-dockerfile.sh" 'make -C common/ebpf generate'
+assert_not_contains "$ROOT/scripts/prepare-ebpf-dockerfile.sh" 'ENV CGO_ENABLED=1'
+assert_not_contains "$ROOT/scripts/prepare-ebpf-dockerfile.sh" 'make -C common/ebpf generate'
 assert_contains "$WORKFLOW" 'prepare_stable:'
 assert_contains "$WORKFLOW" 'prepare_testing:'
 assert_contains "$WORKFLOW" 'merge_stable:'
@@ -163,6 +163,6 @@ assert_contains "$README" '移动分支'
 assert_contains "$README" 'SBOM'
 assert_contains "$README" 'host 网络'
 assert_contains "$README" 'with_ebpf'
-assert_contains "$README" 'CGO: enabled'
+assert_contains "$README" 'CGO: disabled'
 
 echo 'project checks passed'
