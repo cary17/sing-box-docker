@@ -733,7 +733,7 @@ jobs:
           printf '%s\n' "$VERSION_OUTPUT"
           grep -Fx "sing-box version ${{ needs.prepare_testing.outputs.source_version }}" <<< "$VERSION_OUTPUT"
           sed -n 's/^Tags: //p' <<< "$VERSION_OUTPUT" | tr ',' '\n' | grep -Fx 'with_ebpf'
-          grep -Fx 'CGO: enabled' <<< "$VERSION_OUTPUT"
+          grep -Fx 'CGO: disabled' <<< "$VERSION_OUTPUT"
       - name: 更新测试版版本记录
         run: |
           scripts/update-version-record.sh testing \
