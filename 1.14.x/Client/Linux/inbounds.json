@@ -28,11 +28,26 @@
       "auto_redirect": true,
       "endpoint_independent_nat": true
     },
+    //透明代理只需ebpf和tun二选一即可
     {
-      "type": "direct",
-      "tag": "dns-in",
-      "listen": "::",
-      "listen_port": 53
+      "type": "ebpf",
+      "tag": "ebpf-in",
+      "mode": "hybrid",
+      "network": ["tcp", "udp"],
+      "udp_timeout": "5m",
+      "dns_mode": "hijack",
+      "bypass_private_address": true,
+      "bypass_rule_set": [
+        "Geoip-CN"
+      ],
+      "local": {
+        "cgroup_path": "",
+        "ipv6_mode": "auto"
+      },
+      "shared": {
+        "interface": ["enp1s0"],//改为实际接口
+        "ipv6_mode": "always"
+      }
     }
   ]
 }
