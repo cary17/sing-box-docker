@@ -19,12 +19,6 @@
       ],
       "auto_route": true,
       "endpoint_independent_nat": true
-    },
-    {
-      "type": "direct",
-      "tag": "dns-in",
-      "listen": "::",
-      "listen_port": 53
     }
   ],
   "ntp": {
