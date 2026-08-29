@@ -2,6 +2,16 @@
   "route": {
     "rules": [
       {
+        "clash_mode": "Direct",
+        "action": "route",
+        "outbound": "Direct"
+      },
+      {
+        "clash_mode": "Global",
+        "action": "route",
+        "outbound": "Proxy"
+      },
+      {
         "inbound": [
           "tun-in"
         ],
