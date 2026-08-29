@@ -11,7 +11,7 @@
       "type": "tun",
       "tag": "tun-in",
       "interface_name": "tun0",
-      "mtu": 1432,
+      "mtu": 1452,
       "dns_mode": "hijack",
       "route_exclude_address": [
         "192.168.0.0/16",
@@ -25,29 +25,7 @@
         "fdfe:dcba:9876::1/126"
       ],
       "auto_route": true,
-      "auto_redirect": true,
-      "endpoint_independent_nat": true
-    },
-    //透明代理只需ebpf和tun二选一即可
-    {
-      "type": "ebpf",
-      "tag": "ebpf-in",
-      "mode": "hybrid",
-      "network": ["tcp", "udp"],
-      "udp_timeout": "5m",
-      "dns_mode": "hijack",
-      "bypass_private_address": true,
-      "bypass_rule_set": [
-        "Geoip-CN"
-      ],
-      "local": {
-        "cgroup_path": "",
-        "ipv6_mode": "auto"
-      },
-      "shared": {
-        "interface": ["enp1s0"],//改为实际接口
-        "ipv6_mode": "always"
-      }
+      "auto_redirect": true
     }
   ]
 }

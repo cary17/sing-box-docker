@@ -24,8 +24,7 @@
         "server_port": 9080
         }
       },
-      "auto_route": true,
-      "endpoint_independent_nat": true
+      "auto_route": true
     }
   ],
   "ntp": {
@@ -280,6 +279,15 @@
         }
     },
     {
+      "type": "bridge",
+      "tag": "bridge-out",
+      "domain_resolver": 
+        {
+          "server": "local",
+          "strategy": "prefer_ipv4"
+        }
+    },
+    {
       "type": "snell",
       "tag": "MISAKA-HKG",
       "server": "11.11.11.11",
@@ -393,27 +401,6 @@
   "route": {
     "rules": [
       {
-        "action": "sniff",
-        "sniffer": [
-          "http",
-          "tls",
-          "quic",
-          "dns"
-        ]
-      },
-      {
-        "protocol": "dns",
-        "action": "hijack-dns"
-      },
-      {
-        "ip_is_private": true,
-        "outbound": "Direct"
-      },
-      {
-        "network": "icmp",
-        "outbound": "Direct"
-      },
-      {
         "clash_mode": "Direct",
         "action": "route",
         "outbound": "Direct"
@@ -422,6 +409,35 @@
         "clash_mode": "Global",
         "action": "route",
         "outbound": "Proxy"
+      },
+      {
+        "inbound": [
+          "tun-in"
+        ],
+        "action": "resolve",
+        "server": "local",
+        "disable_cache": false,
+        "disable_optimistic_cache": false
+      },
+      {
+        "inbound": [
+          "tun-in"
+        ],
+        "rule_set": [
+          "Geoip-CN",
+          "Geosite-CN"
+        ],
+        "preferred_by": [
+          "bridge-out"
+        ],
+        "action": "route",
+        "outbound": "bridge-out"
+      },
+      {
+        "inbound": [
+          "tun-in"
+        ],
+        "action": "sniff"
       },
       {
         "rule_set": [
@@ -457,11 +473,24 @@
       },
       {
         "rule_set": [
-          "Spotify"
+          "Spotify",
+          "API"
         ],
         "outbound": "HK"
       },
       {
+        "domain_suffix": [
+          "okemby.org",
+          "emby.my",
+          "nebula-media.org",
+          "shrekmedia.org",
+          "191920.xyz",
+          "cn2gias.uk",
+          "ciallo.party",
+          "28.al",
+          "zn.al",
+          "mobaiemby.site"
+        ],
         "rule_set": [
           "Twitch",
           "Bahamut"
@@ -483,18 +512,6 @@
           "OKX",
           "ifast",
           "Wise"
-        ],
-        "outbound": "Direct"
-      },
-      {
-        "rule_set": [
-          "Geosite-CN"
-        ],
-        "outbound": "Direct"
-      },
-      {
-        "rule_set": [
-          "Geoip-CN"
         ],
         "outbound": "Direct"
       }

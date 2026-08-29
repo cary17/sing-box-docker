@@ -2,38 +2,33 @@
   "route": {
     "rules": [
       {
-        "action": "sniff",
-        "sniffer": [
-          "http",
-          "tls",
-          "quic",
-          "dns"
-        ]
+        "inbound": [
+          "tun-in"
+        ],
+        "action": "resolve",
+        "server": "local",
+        "disable_cache": false,
+        "disable_optimistic_cache": false
       },
       {
+        "inbound": [
+          "tun-in"
+        ],
+        "rule_set": [
+          "Geoip-CN",
+          "Geosite-CN"
+        ],
+        "preferred_by": [
+          "bridge-out"
+        ],
+        "action": "route",
+        "outbound": "bridge-out"
+      },
+      {
+        "inbound": [
+          "tun-in"
+        ],
         "action": "sniff"
-      },
-      {
-        "protocol": "dns",
-        "action": "hijack-dns"
-      },
-      {
-        "ip_is_private": true,
-        "outbound": "Direct"
-      },
-      {
-        "network": "icmp",
-        "outbound": "Direct"
-      },
-      {
-        "clash_mode": "Direct",
-        "action": "route",
-        "outbound": "Direct"
-      },
-      {
-        "clash_mode": "Global",
-        "action": "route",
-        "outbound": "Proxy"
       },
       {
         "rule_set": [
@@ -46,6 +41,20 @@
       },
       {
         "rule_set": [
+          "Binance"
+        ],
+        "outbound": "JP"
+      },
+      {
+        "rule_set": [
+          "N26",
+          "Kraken",
+          "Bybit"
+        ],
+        "outbound": "EU"
+      },
+      {
+        "rule_set": [
           "Microsoft",
           "Google",
           "Meta",
@@ -55,11 +64,24 @@
       },
       {
         "rule_set": [
-          "Spotify"
+          "Spotify",
+          "API"
         ],
         "outbound": "HK"
       },
       {
+        "domain_suffix": [
+          "okemby.org",
+          "emby.my",
+          "nebula-media.org",
+          "shrekmedia.org",
+          "191920.xyz",
+          "cn2gias.uk",
+          "ciallo.party",
+          "28.al",
+          "zn.al",
+          "mobaiemby.site"
+        ],
         "rule_set": [
           "Twitch",
           "Bahamut"
@@ -78,20 +100,9 @@
       },
       {
         "rule_set": [
-          "Geosite-CN"
-        ],
-        "outbound": "Direct"
-      },
-      {
-        "action": "resolve",
-        "server": "fakeip",
-        "disable_cache": false,
-        "disable_optimistic_cache": false,
-        "match_only": true
-      },
-      {
-        "rule_set": [
-          "Geoip-CN"
+          "OKX",
+          "ifast",
+          "Wise"
         ],
         "outbound": "Direct"
       }

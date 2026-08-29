@@ -124,6 +124,15 @@
         }
     },
     {
+      "type": "bridge",
+      "tag": "bridge-out",
+      "domain_resolver": 
+        {
+          "server": "local",
+          "strategy": "prefer_ipv4"
+        }
+    },
+    {
       "type": "snell",
       "tag": "MISAKA-HKG",
       "server": "10.10.10.10",
