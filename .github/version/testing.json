@@ -1,13 +1,13 @@
 {
   "channel": "testing",
-  "version": "v1.14.0-rc.1-reF1nd",
-  "published_at": "2026-08-24T21:32:57+08:00",
-  "built_at": "2026-08-24T21:48:44+08:00",
-  "docker_tag": "v1.14.0-rc.1",
+  "version": "v1.14.0-rc.4-reF1nd",
+  "published_at": "2026-08-30T12:03:10+08:00",
+  "built_at": "2026-08-30T15:50:45+08:00",
+  "docker_tag": "v1.14.0-rc.4",
   "source_branch": "reF1nd-testing",
-  "source_commit": "1eeea68a0bbcfa1a92af06149f95f41d73b3db49",
+  "source_commit": "2e3862485f099523c0c2bb3f5b7a48325f8a7ce4",
   "dockerfile_sha256": "a05158d7ef851b47dc742c5b0df8cb27f3d14ff1e227963b61d42b9ede46745f",
-  "ghcr_digest": "sha256:196d77113ce62cb121bd97ebf22f1fd8e943face763ea2d7295fbd76cdafdeb6",
-  "dockerhub_digest": "sha256:b84104be76e8cc6cab644447b8d5db0f92d4360d5ab728a9c8ffa66cc69d8025",
+  "ghcr_digest": "sha256:c9052337bb3e25597b83c18a3a542af274b9407216d9ff080f1e976f474afb3a",
+  "dockerhub_digest": "sha256:046dd66ae29722c237e1672bf0a73435d6c1e7d683487f5fa5207b4c5a1e73c4",
   "ebpf_dockerfile_sha256": "839cbe9ebb352b1f65f1080caa6b70135d9174eb021462d541c9ca38f858287e"
 }
