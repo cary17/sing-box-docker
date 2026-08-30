@@ -16,7 +16,7 @@
           "tun-in"
         ],
         "action": "resolve",
-        "server": "local",
+        "server": "resolved-dns",
         "disable_cache": false,
         "disable_optimistic_cache": false
       },
@@ -240,7 +240,7 @@
       }
     ],
     "final": "FINAL",
-    "default_domain_resolver": "local",
+    "default_domain_resolver": "resolved-dns",
     "default_http_client": "default",
     "auto_detect_interface": true
   }

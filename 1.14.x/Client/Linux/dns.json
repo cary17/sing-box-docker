@@ -2,14 +2,9 @@
   "dns": {
     "servers": [
       {
-        "type": "udp",
-        "tag": "local",
-        "server": "223.5.5.5"
-      },
-      {
         "type": "resolved",
-        "tag": "resolved-in",
-        "service": "resolved",
+        "tag": "resolved-dns",
+        "service": "resolved-service",
         "accept_default_resolvers": true
       },
       {
@@ -23,9 +18,11 @@
       {
         "domain_suffix": [
           "msftncsi.com",
-          "msftconnecttest.com"
+          "msftconnecttest.com",
+          "ntp.tencent.com"
         ],
-        "server": "local"
+        "action": "route",
+        "server": "resolved-dns"
       },
       {
         "query_type": [
@@ -35,6 +32,7 @@
         "server": "fakeip"
       }
     ],
+    "final": "resolved-dns",
     "strategy": "prefer_ipv4",
     "optimistic": true,
     "reverse_mapping": false,

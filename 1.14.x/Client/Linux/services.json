@@ -2,9 +2,9 @@
   "services": [
     {
       "type": "resolved",
-      "tag": "resolved",
+      "tag": "resolved-services",
       "listen": "127.0.0.53",
-      "listen_port": 5353
+      "listen_port": 53
     },
     {
       "type": "api",

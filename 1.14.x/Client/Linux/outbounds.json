@@ -119,7 +119,7 @@
       "tag": "Direct",
       "domain_resolver": 
         {
-          "server": "local",
+          "server": "resolved-dns",
           "strategy": "prefer_ipv4"
         }
     },
@@ -128,7 +128,7 @@
       "tag": "bridge-out",
       "domain_resolver": 
         {
-          "server": "local",
+          "server": "resolved-dns",
           "strategy": "prefer_ipv4"
         }
     },

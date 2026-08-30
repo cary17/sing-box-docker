@@ -19,7 +19,7 @@
       ],
       "platform": {
         "http_proxy": {
-        "enabled": false,
+        "enabled": true,
         "server": "127.0.0.1",
         "server_port": 9080
         }
