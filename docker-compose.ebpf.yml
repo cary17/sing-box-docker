@@ -1,6 +1,6 @@
 services:
   sing-box:
-    image: ghcr.io/cary17/sing-box:testing
+    image: ghcr.io/cary17/sing-box:latest
     container_name: sing-box
     restart: unless-stopped
     network_mode: "host"

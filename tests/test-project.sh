@@ -81,6 +81,14 @@ assert_contains "$WORKFLOW" 'prepare_stable:'
 assert_contains "$WORKFLOW" 'prepare_testing:'
 assert_contains "$WORKFLOW" 'merge_stable:'
 assert_contains "$WORKFLOW" 'merge_testing:'
+assert_contains "$WORKFLOW" 'needs.prepare_stable.outputs.ebpf_dockerfile_sha256'
+assert_contains "$WORKFLOW" 'needs.prepare_testing.outputs.ebpf_dockerfile_sha256'
+assert_contains "$WORKFLOW" '校验稳定版 eBPF 构建特性'
+assert_contains "$WORKFLOW" '校验测试版 eBPF 构建特性'
+if [[ "$(grep -Fc 'file: src/Dockerfile.ebpf' "$WORKFLOW")" -ne 4 ]]; then
+  echo 'stable/testing builds must both use Dockerfile.ebpf for both registries' >&2
+  exit 1
+fi
 # GitHub expressions are intentional literal test patterns.
 # shellcheck disable=SC2016
 assert_contains "$WORKFLOW" 'platforms: ${{ matrix.platform }}'
@@ -164,5 +172,13 @@ assert_contains "$README" 'SBOM'
 assert_contains "$README" 'host 网络'
 assert_contains "$README" 'with_ebpf'
 assert_contains "$README" 'CGO: disabled'
+# Backticks are intentional literal Markdown markers.
+# shellcheck disable=SC2016
+assert_contains "$README" '`stable` 与 `testing` 镜像均使用'
+assert_contains "$README" 'Testing 当前仍是较早的 cilium 双数据路径实现'
+assert_contains "$README" 'Stable 与 Testing 配置差异'
+assert_contains "$README" '不要把 Stable 的统一 TC 配置直接复制到 Testing'
+assert_contains "$EBPF_COMPOSE" 'image: ghcr.io/cary17/sing-box:latest'
+assert_not_contains "$EBPF_COMPOSE" 'image: ghcr.io/cary17/sing-box:testing'
 
 echo 'project checks passed'

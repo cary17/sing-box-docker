@@ -28,12 +28,18 @@ cary17/sing-box:v1.14.0-beta.1          # 测试版特定基础版本
 
 ## eBPF 构建状态
 
-- `testing` 镜像基于 sing-box 1.14 分支，使用 `CGO_ENABLED=0` 和 `with_ebpf` 构建（纯 Go cilium/ebpf，预编译 BPF 对象已提交上游）；
-- `stable` 当前仍基于不含 eBPF 入站的 sing-box 1.13 分支，继续使用上游默认构建；
+- `stable` 与 `testing` 镜像均使用 `CGO_ENABLED=0` 和 `with_ebpf` 构建；Stable 的 sing-box 1.14 正式版已经包含重构后的统一 TC eBPF 入站，Testing 当前仍是较早的 cilium 双数据路径实现；
+- 当前 eBPF 实现基于纯 Go `cilium/ebpf`，构建直接使用上游已提交的预编译 BPF 对象，不启用 CGO、不安装 Clang，也不在镜像构建中重新生成对象；
 - 工作流不会维护上游 Dockerfile 的完整副本。每次构建会严格检查上游关键构建行，生成临时 `Dockerfile.ebpf`；上游结构变化时立即失败，等待人工审查；
 - 构建完成后必须从镜像的 `sing-box version` 输出确认存在 `with_ebpf` 且显示 `CGO: disabled`，否则不会更新版本记录；
 - 版本记录同时保存原始上游 Dockerfile 和临时 eBPF Dockerfile 的 SHA-256。
-- Stable 与 Testing 均按五个平台拆成独立 GitHub Actions 矩阵任务并行构建；单架构仅按 digest 上传镜像 blob，不创建临时标签，只有五个平台全部成功后才合并并覆盖最终标签。Stable 仍使用上游原始 Dockerfile，不启用 eBPF。
+- Stable 与 Testing 均按五个平台拆成独立 GitHub Actions 矩阵任务并行构建；两个渠道都通过同一严格适配脚本生成 `Dockerfile.ebpf`。单架构仅按 digest 上传镜像 blob，不创建临时标签，只有五个平台全部成功并验证 `with_ebpf` 后才合并并覆盖最终标签。
+
+### Stable 与 Testing 配置差异
+
+- Stable 当前统一 TC 入站将 `tc_priority`、`local/shared.bypass_port` 和 `local/shared.bypass_port_range` 放在新结构中，并移除了 `local.cgroup_path` 与 `shared.advanced`；
+- Testing 当前仍使用 `local.cgroup_path` 和 `shared.advanced.tc_priority`，不要把 Stable 的统一 TC 配置直接复制到 Testing，反之亦然；
+- 两个渠道的镜像构建方式相同：纯 Go、显式 `with_ebpf`、不启用 CGO、不在 Docker 构建中生成 BPF 对象。
 
 ## 标签与构建语义
 
@@ -98,7 +104,7 @@ image: ghcr.io/cary17/sing-box@sha256:<manifest-digest>
 docker compose up -d
 ```
 
-`docker-compose.ebpf.yml` 用于 eBPF，不挂载 TUN，也不授予 `NET_RAW`：
+`docker-compose.ebpf.yml` 默认使用正式版 `latest` eBPF 镜像，不挂载 TUN，也不授予 `NET_RAW`：
 
 ```bash
 docker compose -f docker-compose.ebpf.yml up -d

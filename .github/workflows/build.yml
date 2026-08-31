@@ -383,8 +383,14 @@ jobs:
     outputs:
       source_commit: ${{ steps.source.outputs.source_commit }}
       dockerfile_sha256: ${{ steps.source.outputs.dockerfile_sha256 }}
+      ebpf_dockerfile_sha256: ${{ steps.ebpf.outputs.sha256 }}
       source_version: ${{ steps.source.outputs.source_version }}
     steps:
+      - name: Checkout Current Repo
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          path: repo-tools
+          ref: ${{ github.ref_name }}
       - name: 固定上游源码
         id: source
         run: |
@@ -394,6 +400,11 @@ jobs:
             echo "dockerfile_sha256=$(sha256sum src/Dockerfile | cut -d' ' -f1)"
             echo "source_version=$(cd src && go run ./cmd/internal/read_tag)"
           } >> "$GITHUB_OUTPUT"
+      - name: 生成稳定版 eBPF Dockerfile 摘要
+        id: ebpf
+        run: |
+          repo-tools/scripts/prepare-ebpf-dockerfile.sh src/Dockerfile src/Dockerfile.ebpf
+          echo "sha256=$(sha256sum src/Dockerfile.ebpf | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
 
   build_stable:
     name: 构建稳定版镜像 (${{ matrix.platform }})
@@ -420,6 +431,11 @@ jobs:
       needs.check_versions.outputs.stable_need_build == 'true' &&
       (github.event_name != 'workflow_dispatch' || github.event.inputs.branch == 'both' || github.event.inputs.branch == 'stable')
     steps:
+      - name: Checkout Current Repo
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          path: repo-tools
+          ref: ${{ github.ref_name }}
       - name: 克隆上游代码
         run: |
           echo "克隆并验证固定上游提交 ${{ needs.prepare_stable.outputs.source_commit }}..."
@@ -435,6 +451,11 @@ jobs:
           [[ "$(git -C src rev-parse HEAD)" == "${{ needs.prepare_stable.outputs.source_commit }}" ]]
           [[ "$(sha256sum src/Dockerfile | cut -d' ' -f1)" == "${{ needs.prepare_stable.outputs.dockerfile_sha256 }}" ]]
           echo "代码克隆完成"
+
+      - name: 生成稳定版 eBPF Dockerfile
+        run: |
+          repo-tools/scripts/prepare-ebpf-dockerfile.sh src/Dockerfile src/Dockerfile.ebpf
+          [[ "$(sha256sum src/Dockerfile.ebpf | cut -d' ' -f1)" == "${{ needs.prepare_stable.outputs.ebpf_dockerfile_sha256 }}" ]]
 
       - name: Setup QEMU
         uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3
@@ -460,7 +481,7 @@ jobs:
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
         with:
           context: src
-          file: src/Dockerfile
+          file: src/Dockerfile.ebpf
           platforms: ${{ matrix.platform }}
           sbom: true
           provenance: mode=max
@@ -472,7 +493,7 @@ jobs:
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
         with:
           context: src
-          file: src/Dockerfile
+          file: src/Dockerfile.ebpf
           platforms: ${{ matrix.platform }}
           sbom: true
           provenance: mode=max
@@ -672,6 +693,14 @@ jobs:
             "${{ needs.check_versions.outputs.stable_docker_tag }}" \
             "${{ env.GHCR_IMAGE }}" "${{ env.DOCKERHUB_IMAGE }}" "latest,stable" \
             "$RUNNER_TEMP/digests"
+      - name: 校验稳定版 eBPF 构建特性
+        run: |
+          VERSION_OUTPUT="$(docker run --rm --platform linux/amd64 \
+            "${{ env.GHCR_IMAGE }}:${{ needs.check_versions.outputs.stable_docker_tag }}" version)"
+          printf '%s\n' "$VERSION_OUTPUT"
+          grep -Fx "sing-box version ${{ needs.prepare_stable.outputs.source_version }}" <<< "$VERSION_OUTPUT"
+          sed -n 's/^Tags: //p' <<< "$VERSION_OUTPUT" | tr ',' '\n' | grep -Fx 'with_ebpf'
+          grep -Fx 'CGO: disabled' <<< "$VERSION_OUTPUT"
       - name: 更新稳定版版本记录
         run: |
           scripts/update-version-record.sh stable \
@@ -680,7 +709,8 @@ jobs:
             "${{ needs.check_versions.outputs.stable_docker_tag }}" \
             "${{ env.UPSTREAM_STABLE_BRANCH }}" \
             "${{ needs.prepare_stable.outputs.source_commit }}" \
-            "${{ needs.prepare_stable.outputs.dockerfile_sha256 }}" "" \
+            "${{ needs.prepare_stable.outputs.dockerfile_sha256 }}" \
+            "${{ needs.prepare_stable.outputs.ebpf_dockerfile_sha256 }}" \
             "${{ steps.merge.outputs.ghcr_digest }}" \
             "${{ steps.merge.outputs.dockerhub_digest }}"
 
