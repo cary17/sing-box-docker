@@ -1,4 +1,4 @@
-﻿name: Build reF1nd Sing-Box Docker Images
+name: Build reF1nd Sing-Box Docker Images
 
 on:
   schedule:
@@ -403,7 +403,7 @@ jobs:
       - name: 生成稳定版 eBPF Dockerfile 摘要
         id: ebpf
         run: |
-          repo-tools/scripts/prepare-ebpf-dockerfile.sh src/Dockerfile src/Dockerfile.ebpf
+          bash repo-tools/scripts/prepare-ebpf-dockerfile.sh src/Dockerfile src/Dockerfile.ebpf
           echo "sha256=$(sha256sum src/Dockerfile.ebpf | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
 
   build_stable:
@@ -454,7 +454,7 @@ jobs:
 
       - name: 生成稳定版 eBPF Dockerfile
         run: |
-          repo-tools/scripts/prepare-ebpf-dockerfile.sh src/Dockerfile src/Dockerfile.ebpf
+          bash repo-tools/scripts/prepare-ebpf-dockerfile.sh src/Dockerfile src/Dockerfile.ebpf
           [[ "$(sha256sum src/Dockerfile.ebpf | cut -d' ' -f1)" == "${{ needs.prepare_stable.outputs.ebpf_dockerfile_sha256 }}" ]]
 
       - name: Setup QEMU
@@ -543,7 +543,7 @@ jobs:
       - name: 生成 eBPF Dockerfile 摘要
         id: ebpf
         run: |
-          repo-tools/scripts/prepare-ebpf-dockerfile.sh src/Dockerfile src/Dockerfile.ebpf
+          bash repo-tools/scripts/prepare-ebpf-dockerfile.sh src/Dockerfile src/Dockerfile.ebpf
           echo "sha256=$(sha256sum src/Dockerfile.ebpf | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
 
   build_testing:
@@ -595,7 +595,7 @@ jobs:
 
       - name: 生成 eBPF Dockerfile
         run: |
-          repo-tools/scripts/prepare-ebpf-dockerfile.sh src/Dockerfile src/Dockerfile.ebpf
+          bash repo-tools/scripts/prepare-ebpf-dockerfile.sh src/Dockerfile src/Dockerfile.ebpf
           [[ "$(sha256sum src/Dockerfile.ebpf | cut -d' ' -f1)" == "${{ needs.prepare_testing.outputs.ebpf_dockerfile_sha256 }}" ]]
 
       - name: Setup QEMU
@@ -689,7 +689,7 @@ jobs:
       - name: 合并并校验稳定版清单
         id: merge
         run: |
-          scripts/merge-channel-manifests.sh stable \
+          bash scripts/merge-channel-manifests.sh stable \
             "${{ needs.check_versions.outputs.stable_docker_tag }}" \
             "${{ env.GHCR_IMAGE }}" "${{ env.DOCKERHUB_IMAGE }}" "latest,stable" \
             "$RUNNER_TEMP/digests"
@@ -703,7 +703,7 @@ jobs:
           grep -Fx 'CGO: disabled' <<< "$VERSION_OUTPUT"
       - name: 更新稳定版版本记录
         run: |
-          scripts/update-version-record.sh stable \
+          bash scripts/update-version-record.sh stable \
             "${{ needs.check_versions.outputs.stable_version }}" \
             "${{ needs.check_versions.outputs.stable_published_at }}" \
             "${{ needs.check_versions.outputs.stable_docker_tag }}" \
@@ -752,7 +752,7 @@ jobs:
       - name: 合并并校验测试版清单
         id: merge
         run: |
-          scripts/merge-channel-manifests.sh testing \
+          bash scripts/merge-channel-manifests.sh testing \
             "${{ needs.check_versions.outputs.testing_docker_tag }}" \
             "${{ env.GHCR_IMAGE }}" "${{ env.DOCKERHUB_IMAGE }}" "testing" \
             "$RUNNER_TEMP/digests"
@@ -766,7 +766,7 @@ jobs:
           grep -Fx 'CGO: disabled' <<< "$VERSION_OUTPUT"
       - name: 更新测试版版本记录
         run: |
-          scripts/update-version-record.sh testing \
+          bash scripts/update-version-record.sh testing \
             "${{ needs.check_versions.outputs.testing_version }}" \
             "${{ needs.check_versions.outputs.testing_published_at }}" \
             "${{ needs.check_versions.outputs.testing_docker_tag }}" \
