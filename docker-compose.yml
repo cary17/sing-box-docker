@@ -14,6 +14,6 @@ services:
     devices:
       - /dev/net/tun:/dev/net/tun
     volumes:
-      - /opt/sing-box/conf:/etc/sing-box/
+      - ./conf:/etc/sing-box/
       - /run/dbus:/run/dbus:ro
     command: -D /var/lib/sing-box -C /etc/sing-box/ run

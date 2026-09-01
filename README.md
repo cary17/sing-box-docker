@@ -11,10 +11,10 @@
 
 ## 使用
 
-将 sing-box 配置放入 `/opt/sing-box/conf`，然后启动：
+将 sing-box 配置放入 Compose 文件同目录的 `conf/`，然后启动：
 
 ```bash
-mkdir -p /opt/sing-box/conf
+mkdir -p conf
 docker compose up -d
 docker compose exec sing-box sing-box version
 docker compose logs --tail 100 sing-box
