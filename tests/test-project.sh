@@ -163,21 +163,20 @@ assert_not_contains "$CI" 'actions/checkout@v4'
 assert_contains "$CI" 'docker compose config --quiet'
 assert_contains "$CI" 'docker compose -f docker-compose.ebpf.yml config --quiet'
 
-# README 必须说明权限、版本标签覆盖语义和校验方式。
-assert_contains "$README" 'NET_ADMIN'
-assert_contains "$README" 'reF1nd'
-assert_contains "$README" '镜像摘要'
-assert_contains "$README" '移动分支'
-assert_contains "$README" 'SBOM'
-assert_contains "$README" 'host 网络'
+# README 只保留镜像与部署所需的精简使用说明。
+assert_contains "$README" 'ghcr.io/cary17/sing-box:latest'
+assert_contains "$README" 'ghcr.io/cary17/sing-box:testing'
 assert_contains "$README" 'with_ebpf'
 assert_contains "$README" 'CGO: disabled'
-# Backticks are intentional literal Markdown markers.
-# shellcheck disable=SC2016
-assert_contains "$README" '`stable` 与 `testing` 镜像均使用'
-assert_contains "$README" 'Testing 当前仍是较早的 cilium 双数据路径实现'
-assert_contains "$README" 'Stable 与 Testing 配置差异'
-assert_contains "$README" '不要把 Stable 的统一 TC 配置直接复制到 Testing'
+assert_contains "$README" '统一 TC eBPF 入站'
+assert_contains "$README" 'docker compose up -d'
+assert_contains "$README" 'docker compose -f docker-compose.ebpf.yml up -d'
+assert_contains "$README" 'sing-box tools ebpf status --mode local'
+assert_contains "$README" 'sha256:<manifest-digest>'
+assert_contains "$README" 'force_build'
+assert_not_contains "$README" 'Testing 当前仍是较早的 cilium 双数据路径实现'
+assert_not_contains "$README" 'Stable 与 Testing 配置差异'
+assert_not_contains "$README" '构建与供应链记录'
 assert_contains "$EBPF_COMPOSE" 'image: ghcr.io/cary17/sing-box:latest'
 assert_not_contains "$EBPF_COMPOSE" 'image: ghcr.io/cary17/sing-box:testing'
 
