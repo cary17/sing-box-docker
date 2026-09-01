@@ -40,10 +40,10 @@ jobs:
           actionlint .github/workflows/*.yml
           shellcheck scripts/*.sh tests/*.sh
           bash -n scripts/*.sh tests/*.sh
-          tests/test-select-version.sh
-          tests/test-cleanup-policy.sh
-          tests/test-prepare-ebpf-dockerfile.sh
-          tests/test-merge-channel-manifests.sh
-          tests/test-project.sh
+          bash tests/test-select-version.sh
+          bash tests/test-cleanup-policy.sh
+          bash tests/test-prepare-ebpf-dockerfile.sh
+          bash tests/test-merge-channel-manifests.sh
+          bash tests/test-project.sh
           docker compose config --quiet
           docker compose -f docker-compose.ebpf.yml config --quiet
