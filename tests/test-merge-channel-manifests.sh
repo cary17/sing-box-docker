@@ -42,6 +42,24 @@ grep -Fq -- '-t ghcr.test/sing-box:v1.2.3 -t ghcr.test/sing-box:latest -t ghcr.t
 grep -Fx 'ghcr_digest=sha256:test' "$GITHUB_OUTPUT"
 grep -Fx 'dockerhub_digest=sha256:test' "$GITHUB_OUTPUT"
 
+# 修订版只发布完整精确标签和渠道浮动标签，不得额外发布基础版本标签。
+: > "$MOCK_LOG"
+"$ROOT/scripts/merge-channel-manifests.sh" stable v1.2.3-reF1nd.1 ghcr.test/sing-box docker.test/sing-box latest,stable "$TMP/digests" >/dev/null
+grep -Fq -- '-t ghcr.test/sing-box:v1.2.3-reF1nd.1 -t ghcr.test/sing-box:latest -t ghcr.test/sing-box:stable' "$MOCK_LOG"
+if grep -Fq -- '-t ghcr.test/sing-box:v1.2.3 ' "$MOCK_LOG"; then
+  echo 'revision release unexpectedly published base version tag' >&2
+  exit 1
+fi
+
+# Testing 修订版使用相同策略，只保留精确标签与 testing 浮动标签。
+: > "$MOCK_LOG"
+"$ROOT/scripts/merge-channel-manifests.sh" testing v1.2.3-rc.4-reF1nd.2 ghcr.test/sing-box docker.test/sing-box testing "$TMP/digests" >/dev/null
+grep -Fq -- '-t ghcr.test/sing-box:v1.2.3-rc.4-reF1nd.2 -t ghcr.test/sing-box:testing' "$MOCK_LOG"
+if grep -Fq -- '-t ghcr.test/sing-box:v1.2.3-rc.4 ' "$MOCK_LOG"; then
+  echo 'testing revision unexpectedly published base prerelease tag' >&2
+  exit 1
+fi
+
 rm "$TMP/digests/ghcr-arm-v6"
 if "$ROOT/scripts/merge-channel-manifests.sh" stable v1.2.3 ghcr.test/sing-box docker.test/sing-box latest,stable "$TMP/digests" >/dev/null 2>&1; then
   echo 'missing digest unexpectedly passed' >&2

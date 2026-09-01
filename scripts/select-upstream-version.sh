@@ -64,6 +64,15 @@ beijing_time() {
   TZ=Asia/Shanghai date -d "$1" +'%Y-%m-%dT%H:%M:%S+08:00'
 }
 
+docker_tag_for_version() {
+  local version="$1"
+  if [[ "$version" =~ -reF1nd\.[0-9]+$ ]]; then
+    printf '%s\n' "$version"
+  else
+    printf '%s\n' "${version%%-reF1nd*}"
+  fi
+}
+
 release_entry="$(
   jq -r ".[] | ${RELEASE_FILTER} | select(.tag_name | ${RELEASE_TAG_FILTER}) | [.tag_name, (.published_at // .created_at)] | @tsv" "$RELEASES_JSON" |
     while IFS=$'\t' read -r tag published_at; do
@@ -81,7 +90,7 @@ if [[ -n "$release_entry" ]]; then
     version="$release_version"
     published_at="$release_published_at"
     source="release"
-    docker_tag="${version%%-reF1nd*}"
+    docker_tag="$(docker_tag_for_version "$version")"
     jq -n \
       --arg version "$version" \
       --arg published_at "$published_at" \
@@ -121,7 +130,7 @@ fi
 version="$best_version"
 published_at="$TAG_PUBLISHED_AT"
 source="tag"
-docker_tag="${version%%-reF1nd*}"
+docker_tag="$(docker_tag_for_version "$version")"
 
 jq -n \
   --arg version "$version" \

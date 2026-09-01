@@ -32,16 +32,32 @@ STABLE="$(bash "$SCRIPT" stable "$TMP/releases.json")"
 [[ "$(jq -r '.version' <<< "$TESTING")" == 'v1.14.0-beta.1-reF1nd' ]]
 [[ "$(jq -r '.docker_tag' <<< "$TESTING")" == 'v1.14.0-beta.1' ]]
 [[ "$(jq -r '.version' <<< "$STABLE")" == 'v1.13.14-reF1nd.2' ]]
-[[ "$(jq -r '.docker_tag' <<< "$STABLE")" == 'v1.13.14' ]]
+[[ "$(jq -r '.docker_tag' <<< "$STABLE")" == 'v1.13.14-reF1nd.2' ]]
 
-# 同一基础版本的 reF1nd 修订号会映射到同一 Docker tag，以新修订覆盖旧镜像。
+# 只有带数字修订号的 reF1nd 版本使用完整 Docker tag；不带修订号时保持短 tag。
 cat > "$TMP/revision-one.json" <<'JSON'
 [
   {"tag_name":"v1.13.14-reF1nd.1","draft":false,"prerelease":false,"published_at":"2026-07-23T00:00:00Z"}
 ]
 JSON
 REVISION_ONE="$(bash "$SCRIPT" stable "$TMP/revision-one.json")"
-[[ "$(jq -r '.docker_tag' <<< "$REVISION_ONE")" == 'v1.13.14' ]]
+[[ "$(jq -r '.docker_tag' <<< "$REVISION_ONE")" == 'v1.13.14-reF1nd.1' ]]
+
+cat > "$TMP/no-revision.json" <<'JSON'
+[
+  {"tag_name":"v1.13.14-reF1nd","draft":false,"prerelease":false,"published_at":"2026-07-22T00:00:00Z"}
+]
+JSON
+NO_REVISION="$(bash "$SCRIPT" stable "$TMP/no-revision.json")"
+[[ "$(jq -r '.docker_tag' <<< "$NO_REVISION")" == 'v1.13.14' ]]
+
+cat > "$TMP/testing-revision.json" <<'JSON'
+[
+  {"tag_name":"v1.14.0-rc.4-reF1nd.2","draft":false,"prerelease":true,"published_at":"2026-07-24T00:00:00Z"}
+]
+JSON
+TESTING_REVISION="$(bash "$SCRIPT" testing "$TMP/testing-revision.json")"
+[[ "$(jq -r '.docker_tag' <<< "$TESTING_REVISION")" == 'v1.14.0-rc.4-reF1nd.2' ]]
 
 # Release 没有更新时，tags 回退仍需正确排序 alpha < beta < rc，并保留短 Docker tag。
 EMPTY_RELEASES="$TMP/empty-releases.json"
@@ -51,7 +67,7 @@ FALLBACK_STABLE="$(bash "$SCRIPT" stable "$EMPTY_RELEASES" "$TMP/tags.json" '' '
 [[ "$(jq -r '.version' <<< "$FALLBACK_TESTING")" == 'v1.14.0-rc.1-reF1nd' ]]
 [[ "$(jq -r '.docker_tag' <<< "$FALLBACK_TESTING")" == 'v1.14.0-rc.1' ]]
 [[ "$(jq -r '.version' <<< "$FALLBACK_STABLE")" == 'v1.13.14-reF1nd.2' ]]
-[[ "$(jq -r '.docker_tag' <<< "$FALLBACK_STABLE")" == 'v1.13.14' ]]
+[[ "$(jq -r '.docker_tag' <<< "$FALLBACK_STABLE")" == 'v1.13.14-reF1nd.2' ]]
 
 # 已记录相同或更新版本时，脚本必须用状态 3 表示无需构建。
 if bash "$SCRIPT" stable "$TMP/releases.json" "" 'v1.13.14-reF1nd.2' >/dev/null; then

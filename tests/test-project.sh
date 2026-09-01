@@ -105,13 +105,14 @@ assert_not_contains "$WORKFLOW" 'stable-build-${{ matrix.slug }}'
 assert_not_contains "$WORKFLOW" 'testing-build-${{ matrix.slug }}'
 assert_contains "$WORKFLOW" 'source_version'
 
-# 用户要求保留从所选移动分支构建，并让 reF1nd 修订覆盖相同短 tag。
+# 用户要求保留从所选移动分支构建；带数字修订号时发布完整精确标签。
 assert_contains "$WORKFLOW" 'git clone --depth 1 --branch'
 assert_contains "$WORKFLOW" 'stable_docker_tag'
 assert_contains "$WORKFLOW" 'testing_docker_tag'
-# Literal pattern guards the intended tag mapping.
+assert_contains "$ROOT/scripts/select-upstream-version.sh" 'docker_tag_for_version'
+# Literal pattern guards the unversioned reF1nd tag mapping.
 # shellcheck disable=SC2016
-assert_contains "$ROOT/scripts/select-upstream-version.sh" 'docker_tag="${version%%-reF1nd*}"'
+assert_contains "$ROOT/scripts/select-upstream-version.sh" 'printf '\''%s\n'\'' "${version%%-reF1nd*}"'
 
 # TUN Compose 只保留 TUN 所需权限。
 assert_contains "$COMPOSE" '      - ./conf:/etc/sing-box/'
@@ -174,7 +175,8 @@ assert_contains "$README" 'docker compose up -d'
 assert_contains "$README" 'docker compose pull'
 assert_contains "$README" 'mkdir -p conf'
 assert_not_contains "$README" '/opt/sing-box'
-assert_contains "$README" 'sha256:<manifest-digest>'
+assert_contains "$README" 'image: ghcr.io/cary17/sing-box:v1.14.0'
+assert_not_contains "$README" 'sha256:<manifest-digest>'
 assert_contains "$README" 'force_build'
 assert_not_contains "$README" 'eBPF'
 assert_not_contains "$README" 'with_ebpf'

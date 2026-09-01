@@ -27,10 +27,10 @@ docker compose pull
 docker compose up -d
 ```
 
-生产环境可使用摘要固定镜像：
+生产环境可使用版本标签固定镜像：
 
 ```yaml
-image: ghcr.io/cary17/sing-box@sha256:<manifest-digest>
+image: ghcr.io/cary17/sing-box:v1.14.0
 ```
 
 GitHub Actions 会自动检测 Stable/Testing 新版本；手动运行时可选择渠道并使用 `force_build` 强制构建。
