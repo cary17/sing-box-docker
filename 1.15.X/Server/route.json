@@ -1,0 +1,32 @@
+{
+  "route": {
+    "rule_set": [
+      {
+        "type": "remote",
+        "tag": "openai",
+        "format": "source",
+        "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/blob/rule-set/geosite-openai.srs",
+        "update_interval": "1d"
+      }
+    ],
+    "rules": [
+      {
+        "action": "sniff",
+        "sniffer": [
+          "http",
+          "tls",
+          "quic",
+          "dns"
+        ]
+      },
+      {
+        "rule_set": "openai",
+        "outbound": "wireguard"
+      }
+    ],
+    "final": "direct",
+    "default_domain_resolver": "Google",
+    "default_http_client": "default",
+    "auto_detect_interface": false
+  }
+}

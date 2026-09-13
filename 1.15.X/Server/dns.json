@@ -2,8 +2,14 @@
   "dns": {
     "servers": [
       {
-        "type": "local",
-        "tag": "local"
+        "type": "udp",
+        "tag": "Google",
+        "server": "8.8.8.8"
+      },
+      {
+        "type": "udp",
+        "tag": "Cloudflare",
+        "server": "1.0.0.1"
       },
       {
         "type": "fakeip",
@@ -14,13 +20,10 @@
     ],
     "rules": [
       {
-        "domain_suffix": [
-          "msftncsi.com",
-          "msftconnecttest.com",
-          "ntp.tencent.com"
+        "inbound": [
+          "wireguard"
         ],
-        "action": "route",
-        "server": "local"
+        "server": "Cloudflare"
       },
       {
         "query_type": [
@@ -30,10 +33,9 @@
         "server": "fakeip"
       }
     ],
-    "final": "local",
     "strategy": "prefer_ipv4",
-    "optimistic": true,
     "reverse_mapping": false,
+    "optimistic": true,
     "cache_capacity": 51200
   }
 }

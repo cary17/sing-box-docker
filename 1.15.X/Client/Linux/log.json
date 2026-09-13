@@ -1,0 +1,9 @@
+{
+  "$schema": "https://sing-box.sagernet.org/schema.json",
+  "log": {
+    "disabled": false,
+    "level": "info",
+    "output": "/etc/sing-box/sing-box.log",
+    "timestamp": true
+  }
+}

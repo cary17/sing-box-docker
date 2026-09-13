@@ -2,6 +2,12 @@
   "route": {
     "rules": [
       {
+        "inbound": [
+          "tun-in"
+        ],
+        "action": "sniff"
+      },
+      {
         "clash_mode": "Direct",
         "action": "route",
         "outbound": "Direct"
@@ -12,33 +18,10 @@
         "outbound": "Proxy"
       },
       {
-        "inbound": [
-          "tun-in"
-        ],
-        "action": "resolve",
-        "server": "resolved-dns",
-        "disable_cache": false,
-        "disable_optimistic_cache": false
-      },
-      {
-        "inbound": [
-          "tun-in"
-        ],
         "rule_set": [
-          "Geoip-CN",
           "Geosite-CN"
         ],
-        "preferred_by": [
-          "bridge-out"
-        ],
-        "action": "route",
-        "outbound": "bridge-out"
-      },
-      {
-        "inbound": [
-          "tun-in"
-        ],
-        "action": "sniff"
+        "outbound": "Direct"
       },
       {
         "rule_set": [
@@ -80,18 +63,6 @@
         "outbound": "HK"
       },
       {
-        "domain_suffix": [
-          "okemby.org",
-          "emby.my",
-          "nebula-media.org",
-          "shrekmedia.org",
-          "191920.xyz",
-          "cn2gias.uk",
-          "ciallo.party",
-          "28.al",
-          "zn.al",
-          "mobaiemby.site"
-        ],
         "rule_set": [
           "Twitch",
           "Bahamut"
@@ -113,6 +84,16 @@
           "OKX",
           "ifast",
           "Wise"
+        ],
+        "outbound": "Direct"
+      },
+      {
+        "action": "resolve",
+        "match_only": true
+      },
+      {
+        "rule_set": [
+          "Geoip-CN"
         ],
         "outbound": "Direct"
       }
@@ -240,7 +221,7 @@
       }
     ],
     "final": "FINAL",
-    "default_domain_resolver": "resolved-dns",
+    "default_domain_resolver": "local",
     "default_http_client": "default",
     "auto_detect_interface": true
   }
