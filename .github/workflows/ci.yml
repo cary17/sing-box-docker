@@ -5,14 +5,14 @@ on:
     paths:
       - 'scripts/**'
       - 'tests/**'
-      - 'docker-compose.yml'
+      - 'docker-compose*.yml'
       - '.github/workflows/**'
       - 'README.md'
   pull_request:
     paths:
       - 'scripts/**'
       - 'tests/**'
-      - 'docker-compose.yml'
+      - 'docker-compose*.yml'
       - '.github/workflows/**'
       - 'README.md'
 
@@ -39,7 +39,7 @@ jobs:
         run: |
           actionlint .github/workflows/*.yml
           shellcheck scripts/*.sh tests/*.sh
-          bash -n scripts/*.sh tests/*.sh
+          for script in scripts/*.sh tests/*.sh; do bash -n "$script"; done
           bash tests/test-select-version.sh
           bash tests/test-cleanup-policy.sh
           bash tests/test-prepare-ebpf-dockerfile.sh
