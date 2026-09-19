@@ -20,6 +20,19 @@ docker compose exec sing-box sing-box version
 docker compose logs --tail 100 sing-box
 ```
 
+运行数据保存在 `sing-box-data` 命名卷中，容器重建后保留。首次从旧版 Compose 升级时，如需保留旧容器内的数据，先执行一次迁移：
+
+```bash
+docker compose stop
+docker cp sing-box:/var/lib/sing-box/. ./sing-box-data-backup
+docker compose pull
+docker compose create
+docker cp ./sing-box-data-backup/. sing-box:/var/lib/sing-box/
+docker compose start
+```
+
+保留备份直到确认运行正常；`docker compose down -v` 会删除数据卷。首次部署和完成迁移后的日常更新使用下方命令。
+
 更新镜像：
 
 ```bash
