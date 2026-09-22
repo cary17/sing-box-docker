@@ -173,7 +173,7 @@ assert_contains "$WORKFLOW" 'source scripts/version-key.sh'
 assert_contains "$CI" "'docker-compose*.yml'"
 assert_contains "$COMPOSE" 'sing-box-data:/var/lib/sing-box'
 assert_contains "$EBPF_COMPOSE" 'sing-box-data:/var/lib/sing-box'
-assert_contains "$WORKFLOW" 'git -C src fetch --depth 1 origin'
+assert_contains "$WORKFLOW" 'git -C src fetch --depth 1 --tags origin'
 assert_contains "$WORKFLOW" 'git -C src checkout --detach FETCH_HEAD'
 assert_contains "$WORKFLOW" 'bash scripts/merge-channel-manifests.sh'
 
@@ -183,6 +183,7 @@ trap 'rm -rf "$TMP"' EXIT
 git init -q "$TMP/upstream"
 git -C "$TMP/upstream" -c user.name=Test -c user.email=test@example.invalid commit -qm initial --allow-empty
 PINNED="$(git -C "$TMP/upstream" rev-parse HEAD)"
+git -C "$TMP/upstream" tag v1.2.3
 git -C "$TMP/upstream" -c user.name=Test -c user.email=test@example.invalid commit -qm advanced --allow-empty
 for channel in stable testing; do
   commands="$(awk -v job="build_${channel}:" '
@@ -203,7 +204,73 @@ for channel in stable testing; do
     exit 1
   }
   [[ "$(git -C "$TMP/$channel/src" rev-parse HEAD)" == "$PINNED" ]]
+  [[ "$(git -C "$TMP/$channel/src" describe --tags)" == v1.2.3 ]]
 done
+
+# Run the prepare version guard with the upstream helper's failure modes.
+for channel in stable testing; do
+  guard="$(awk -v job="prepare_${channel}:" '
+    $0 == "  " job { inside = 1 }
+    inside && /if ! SOURCE_VERSION=/ { capture = 1 }
+    capture { print }
+    capture && /^          fi$/ { exit }
+  ' "$WORKFLOW")"
+  [[ -n "$guard" ]]
+  for result in unknown empty failed valid; do
+    if (
+      cd "$TMP/$channel"
+      # Invoked by the extracted workflow in a child shell.
+      # shellcheck disable=SC2317
+      go() {
+        case "$result" in
+          unknown) echo unknown;;
+          empty) :;;
+          failed) return 1;;
+          valid) echo 1.2.3;;
+        esac
+      }
+      export -f go
+      export result
+      bash -eu -c "$guard"
+    ) >/dev/null 2>&1; then
+      [[ "$result" == valid ]]
+    else
+      [[ "$result" != valid ]]
+    fi
+  done
+done
+
+# Execute both production version-check guards, including helper failures.
+for channel in stable testing; do
+  guard="$(awk -v step="${channel}_check" '
+    $0 == "        id: " step { inside = 1 }
+    inside && /source scripts\/version-key.sh/ { capture = 1 }
+    capture { print }
+    capture && /^          fi$/ { exit }
+  ' "$WORKFLOW")"
+  [[ -n "$guard" ]]
+  for result in valid empty_local invalid_current invalid_local; do
+    CURRENT=v1.2.3-reF1nd LOCAL=v1.2.2-reF1nd
+    case "$result" in
+      empty_local) LOCAL="";;
+      invalid_current) CURRENT=invalid;;
+      invalid_local) LOCAL=invalid;;
+    esac
+    if (cd "$ROOT" && export CURRENT LOCAL && bash -eu -c "$guard") >/dev/null 2>&1; then
+      [[ "$result" == valid || "$result" == empty_local ]]
+    else
+      [[ "$result" == invalid_current || "$result" == invalid_local ]]
+    fi
+  done
+done
+
+# Only version detection reads the moving repository branch.
+# shellcheck disable=SC2016
+[[ "$(grep -Fc 'ref: ${{ github.sha }}' "$WORKFLOW")" -eq 6 ]]
+# shellcheck disable=SC2016
+[[ "$(grep -Fc 'ref: ${{ github.ref_name }}' "$WORKFLOW")" -eq 1 ]]
+[[ "$(grep -Fc 'contents: write' "$WORKFLOW")" -eq 2 ]]
+assert_contains "$CI" 'tests/test-update-version-record.sh'
 
 # 仓库脚本必须以非可执行 100644 跟踪（以 Git 索引为准），确保任何推送方式都不依赖执行位。
 policy_modes="$(git -C "$ROOT" ls-files --stage -- 'scripts/*.sh' 'tests/*.sh')"
