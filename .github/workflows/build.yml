@@ -164,21 +164,19 @@ jobs:
         run: |
           NEED="false"
 
-          version_gt() {
-            [[ -z "$2" ]] && return 0
-            [[ "$1" == "$2" ]] && return 1
-
-            source scripts/version-key.sh
-
-            [[ "$(version_key "$1")" > "$(version_key "$2")" ]]
-          }
+          source scripts/version-key.sh
+          CURRENT_KEY="$(version_key "$CURRENT")"
+          LOCAL_KEY=""
+          if [[ -n "$LOCAL" ]]; then
+            LOCAL_KEY="$(version_key "$LOCAL")"
+          fi
 
           if [[ "$SELECTED_BRANCH" != "both" && "$SELECTED_BRANCH" != "stable" ]]; then
             echo "手动触发选择了 ${SELECTED_BRANCH}，跳过稳定版"
           elif [[ "${{ github.event.inputs.force_build }}" == "true" ]]; then
             NEED="true"
             echo "强制构建稳定版"
-          elif version_gt "$CURRENT" "$LOCAL"; then
+          elif [[ "$CURRENT_KEY" > "$LOCAL_KEY" ]]; then
             NEED="true"
             echo "检测到稳定版新版本"
             echo "远程: $CURRENT"
@@ -277,21 +275,19 @@ jobs:
         run: |
           NEED="false"
 
-          version_gt() {
-            [[ -z "$2" ]] && return 0
-            [[ "$1" == "$2" ]] && return 1
-
-            source scripts/version-key.sh
-
-            [[ "$(version_key "$1")" > "$(version_key "$2")" ]]
-          }
+          source scripts/version-key.sh
+          CURRENT_KEY="$(version_key "$CURRENT")"
+          LOCAL_KEY=""
+          if [[ -n "$LOCAL" ]]; then
+            LOCAL_KEY="$(version_key "$LOCAL")"
+          fi
 
           if [[ "$SELECTED_BRANCH" != "both" && "$SELECTED_BRANCH" != "testing" ]]; then
             echo "手动触发选择了 ${SELECTED_BRANCH}，跳过测试版"
           elif [[ "${{ github.event.inputs.force_build }}" == "true" ]]; then
             NEED="true"
             echo "强制构建测试版"
-          elif version_gt "$CURRENT" "$LOCAL"; then
+          elif [[ "$CURRENT_KEY" > "$LOCAL_KEY" ]]; then
             NEED="true"
             echo "检测到测试版新版本"
             echo "远程: $CURRENT"
@@ -322,13 +318,16 @@ jobs:
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           path: repo-tools
-          ref: ${{ github.ref_name }}
+          ref: ${{ github.sha }}
       - name: 固定上游源码
         id: source
         run: |
           git clone --depth 1 --branch "${{ env.UPSTREAM_STABLE_BRANCH }}" "${{ env.UPSTREAM_REPO }}" src
-          SOURCE_VERSION="$(cd src && go run ./cmd/internal/read_tag)"
-          [[ -n "$SOURCE_VERSION" ]]
+          if ! SOURCE_VERSION="$(cd src && go run ./cmd/internal/read_tag)" ||
+            [[ -z "$SOURCE_VERSION" || "$SOURCE_VERSION" == "unknown" ]]; then
+            echo "Failed to determine upstream source version" >&2
+            exit 1
+          fi
           {
             echo "source_commit=$(git -C src rev-parse HEAD)"
             echo "dockerfile_sha256=$(sha256sum src/Dockerfile | cut -d' ' -f1)"
@@ -359,7 +358,7 @@ jobs:
           - platform: linux/arm/v6
             slug: arm-v6
     permissions:
-      contents: write
+      contents: read
       packages: write
     if: >-
       needs.check_versions.outputs.stable_need_build == 'true' &&
@@ -369,14 +368,14 @@ jobs:
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           path: repo-tools
-          ref: ${{ github.ref_name }}
+          ref: ${{ github.sha }}
       - name: 克隆上游代码
         run: |
           echo "克隆并验证固定上游提交 ${{ needs.prepare_stable.outputs.source_commit }}..."
           for attempt in 1 2 3; do
             rm -rf src
             if git init src && git -C src remote add origin "${{ env.UPSTREAM_REPO }}" &&
-              git -C src fetch --depth 1 origin "${{ needs.prepare_stable.outputs.source_commit }}" &&
+              git -C src fetch --depth 1 --tags origin "${{ needs.prepare_stable.outputs.source_commit }}" &&
               git -C src checkout --detach FETCH_HEAD; then
               break
             fi
@@ -465,13 +464,16 @@ jobs:
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           path: repo-tools
-          ref: ${{ github.ref_name }}
+          ref: ${{ github.sha }}
       - name: 固定上游源码并验证 eBPF Dockerfile
         id: source
         run: |
           git clone --depth 1 --branch "${{ env.UPSTREAM_TESTING_BRANCH }}" "${{ env.UPSTREAM_REPO }}" src
-          SOURCE_VERSION="$(cd src && go run ./cmd/internal/read_tag)"
-          [[ -n "$SOURCE_VERSION" ]]
+          if ! SOURCE_VERSION="$(cd src && go run ./cmd/internal/read_tag)" ||
+            [[ -z "$SOURCE_VERSION" || "$SOURCE_VERSION" == "unknown" ]]; then
+            echo "Failed to determine upstream source version" >&2
+            exit 1
+          fi
           {
             echo "source_commit=$(git -C src rev-parse HEAD)"
             echo "dockerfile_sha256=$(sha256sum src/Dockerfile | cut -d' ' -f1)"
@@ -502,7 +504,7 @@ jobs:
           - platform: linux/arm/v6
             slug: arm-v6
     permissions:
-      contents: write
+      contents: read
       packages: write
     if: >-
       needs.check_versions.outputs.testing_need_build == 'true' &&
@@ -512,7 +514,7 @@ jobs:
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           path: repo-tools
-          ref: ${{ github.ref_name }}
+          ref: ${{ github.sha }}
 
       - name: 克隆上游代码
         run: |
@@ -520,7 +522,7 @@ jobs:
           for attempt in 1 2 3; do
             rm -rf src
             if git init src && git -C src remote add origin "${{ env.UPSTREAM_REPO }}" &&
-              git -C src fetch --depth 1 origin "${{ needs.prepare_testing.outputs.source_commit }}" &&
+              git -C src fetch --depth 1 --tags origin "${{ needs.prepare_testing.outputs.source_commit }}" &&
               git -C src checkout --detach FETCH_HEAD; then
               break
             fi
@@ -602,7 +604,7 @@ jobs:
       - name: Checkout Current Repo
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          ref: ${{ github.ref_name }}
+          ref: ${{ github.sha }}
           token: ${{ secrets.GITHUB_TOKEN }}
           fetch-depth: 0
       - name: Setup Docker Buildx
@@ -655,7 +657,7 @@ jobs:
       - name: Checkout Current Repo
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          ref: ${{ github.ref_name }}
+          ref: ${{ github.sha }}
           token: ${{ secrets.GITHUB_TOKEN }}
           fetch-depth: 0
       - name: Setup QEMU
