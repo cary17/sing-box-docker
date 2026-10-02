@@ -195,7 +195,7 @@ for channel in stable testing; do
   [[ -n "$commands" ]]
   # Replace GitHub expressions only; execute the production commands unchanged.
   # shellcheck disable=SC2016
-  commands="${commands//'${{ env.UPSTREAM_REPO }}' /"$TMP/upstream"}"
+  commands="${commands//'${{ env.UPSTREAM_REPO }}'/"$TMP/upstream"}"
   expression="\${{ needs.prepare_${channel}.outputs.source_commit }}"
   commands="${commands//"$expression"/"$PINNED"}"
   mkdir "$TMP/$channel"
