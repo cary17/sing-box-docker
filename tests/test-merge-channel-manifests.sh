@@ -32,10 +32,16 @@ fi
 if [[ "$*" == *"imagetools inspect"* ]]; then
   [[ "$failure" != inspect ]] || exit 1
   if [[ "$failure" == json ]]; then echo '{'; exit 0; fi
-  jq --arg failure "$failure" --arg digest "$MANIFEST_DIGEST" '
+  # 清单内容完全由环境变量控制：MOCK_ARM64_VARIANT 设定 arm64 variant，
+  # MOCK_DROP_ARCH 删除某个 architecture。
+  jq --arg failure "$failure" --arg digest "$MANIFEST_DIGEST" \
+    --arg arm64_variant "${MOCK_ARM64_VARIANT:-}" \
+    --arg drop_arch "${MOCK_DROP_ARCH:-}" '
     .digest = $digest
     | if $failure == "platform" then .manifests |= .[:1] else . end
     | if $failure == "digest" then .digest = "sha256:invalid" else . end
+    | if $drop_arch != "" then .manifests |= map(select(.platform.architecture != $drop_arch)) else . end
+    | if $arm64_variant != "" then .manifests |= map(if .platform.architecture == "arm64" then .platform.variant = $arm64_variant else . end) else . end
   ' <<'JSON'
 {"manifests":[
 {"platform":{"os":"linux","architecture":"amd64"}},
@@ -93,6 +99,37 @@ if grep -Fq -- '-t ghcr.test/sing-box:v1.2.3-rc.4 ' "$MOCK_LOG"; then
   echo 'testing revision unexpectedly published base prerelease tag' >&2
   exit 1
 fi
+
+# linux/arm64/v8 是 docker buildx 报告的等价 arm64 表示，正规化后必须通过校验并正常发布。
+: > "$MOCK_LOG"
+: > "$GITHUB_OUTPUT"
+export MOCK_ARM64_VARIANT=v8
+bash "$ROOT/scripts/merge-channel-manifests.sh" stable v1.2.3 ghcr.test/sing-box docker.test/sing-box latest,stable "$TMP/digests" 1.2.3 >/dev/null
+grep -Fq -- '-t ghcr.test/sing-box:v1.2.3 -t ghcr.test/sing-box:latest -t ghcr.test/sing-box:stable' "$MOCK_LOG"
+grep -Fq -- '-t docker.test/sing-box:v1.2.3 -t docker.test/sing-box:latest -t docker.test/sing-box:stable' "$MOCK_LOG"
+grep -Fx "ghcr_digest=$MANIFEST_DIGEST" "$GITHUB_OUTPUT"
+grep -Fx "dockerhub_digest=$MANIFEST_DIGEST" "$GITHUB_OUTPUT"
+unset MOCK_ARM64_VARIANT
+
+# 缺失架构必须在发布任何公共标签前失败，公共标签保持不变。
+: > "$MOCK_LOG"
+: > "$GITHUB_OUTPUT"
+export MOCK_DROP_ARCH=arm64
+if bash "$ROOT/scripts/merge-channel-manifests.sh" stable v1.2.3 ghcr.test/sing-box docker.test/sing-box latest,stable "$TMP/digests" 1.2.3 >"$TMP/stdout" 2>"$TMP/stderr"; then
+  echo 'missing architecture unexpectedly passed' >&2
+  exit 1
+fi
+grep -Fq 'missing platform: ghcr.test/sing-box linux/arm64' "$TMP/stderr"
+[[ ! -s "$GITHUB_OUTPUT" ]]
+if grep -Fq -- '-t ghcr.test/sing-box:v1.2.3' "$MOCK_LOG" || grep -Fq -- '-t docker.test/sing-box:v1.2.3' "$MOCK_LOG"; then
+  echo 'missing architecture published a public tag' >&2
+  exit 1
+fi
+if grep 'imagetools create' "$MOCK_LOG" | grep -qv ':build-'; then
+  echo 'missing architecture changed a public tag' >&2
+  exit 1
+fi
+unset MOCK_DROP_ARCH
 
 # Validation failures must not publish either registry; publication failures must
 # still fail the step and leave version-record outputs unwritten.

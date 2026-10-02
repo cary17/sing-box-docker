@@ -321,11 +321,20 @@ jobs:
           ref: ${{ github.sha }}
       - name: 固定上游源码
         id: source
+        env:
+          EXPECTED_VERSION: ${{ needs.check_versions.outputs.stable_version }}
         run: |
           git clone --depth 1 --branch "${{ env.UPSTREAM_STABLE_BRANCH }}" "${{ env.UPSTREAM_REPO }}" src
           if ! SOURCE_VERSION="$(cd src && go run ./cmd/internal/read_tag)" ||
             [[ -z "$SOURCE_VERSION" || "$SOURCE_VERSION" == "unknown" ]]; then
             echo "Failed to determine upstream source version" >&2
+            exit 1
+          fi
+          # 只去掉一个前导 v/V 后完整比较；修订号与预发布后缀必须逐字符一致。
+          ACTUAL_VERSION="${SOURCE_VERSION#[vV]}"
+          EXPECTED_NORMALIZED="${EXPECTED_VERSION#[vV]}"
+          if [[ "$ACTUAL_VERSION" != "$EXPECTED_NORMALIZED" ]]; then
+            echo "Upstream source version mismatch: expected '${EXPECTED_VERSION}' (normalized '${EXPECTED_NORMALIZED}'), got '${SOURCE_VERSION}' (normalized '${ACTUAL_VERSION}')" >&2
             exit 1
           fi
           {
@@ -467,11 +476,20 @@ jobs:
           ref: ${{ github.sha }}
       - name: 固定上游源码并验证 eBPF Dockerfile
         id: source
+        env:
+          EXPECTED_VERSION: ${{ needs.check_versions.outputs.testing_version }}
         run: |
           git clone --depth 1 --branch "${{ env.UPSTREAM_TESTING_BRANCH }}" "${{ env.UPSTREAM_REPO }}" src
           if ! SOURCE_VERSION="$(cd src && go run ./cmd/internal/read_tag)" ||
             [[ -z "$SOURCE_VERSION" || "$SOURCE_VERSION" == "unknown" ]]; then
             echo "Failed to determine upstream source version" >&2
+            exit 1
+          fi
+          # 只去掉一个前导 v/V 后完整比较；修订号与预发布后缀必须逐字符一致。
+          ACTUAL_VERSION="${SOURCE_VERSION#[vV]}"
+          EXPECTED_NORMALIZED="${EXPECTED_VERSION#[vV]}"
+          if [[ "$ACTUAL_VERSION" != "$EXPECTED_NORMALIZED" ]]; then
+            echo "Upstream source version mismatch: expected '${EXPECTED_VERSION}' (normalized '${EXPECTED_NORMALIZED}'), got '${SOURCE_VERSION}' (normalized '${ACTUAL_VERSION}')" >&2
             exit 1
           fi
           {

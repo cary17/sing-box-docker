@@ -30,11 +30,14 @@ merge_registry() {
   # Explicit returns also work inside command substitutions, where errexit is cleared.
   docker buildx imagetools create -t "${image}:${STAGING_TAG}" "${sources[@]}" >&2 || return 1
   manifest="$(docker buildx imagetools inspect "${image}:${STAGING_TAG}" --format '{{json .Manifest}}')" || return 1
+  # docker buildx 会把 linux/arm64 报告为 linux/arm64/v8；等价的 arm64 表示需正规化，
+  # 其余 variant 以及 arm/v6、arm/v7 必须原样保留。
   actual="$(jq -r '
     .manifests[]
     | select(.platform.os != "unknown")
     | (.platform.os + "/" + .platform.architecture
        + (if .platform.variant then "/" + .platform.variant else "" end))
+    | if . == "linux/arm64/v8" then "linux/arm64" else . end
   ' <<< "$manifest")" || return 1
   for platform in "${EXPECTED_PLATFORMS[@]}"; do
     grep -qx "$platform" <<< "$actual" || { echo "missing platform: $image $platform" >&2; return 1; }

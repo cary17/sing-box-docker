@@ -195,7 +195,7 @@ for channel in stable testing; do
   [[ -n "$commands" ]]
   # Replace GitHub expressions only; execute the production commands unchanged.
   # shellcheck disable=SC2016
-  commands="${commands//'${{ env.UPSTREAM_REPO }}'/"$TMP/upstream"}"
+  commands="${commands//'${{ env.UPSTREAM_REPO }}'"/"$TMP/upstream"}"
   expression="\${{ needs.prepare_${channel}.outputs.source_commit }}"
   commands="${commands//"$expression"/"$PINNED"}"
   mkdir "$TMP/$channel"
@@ -207,36 +207,73 @@ for channel in stable testing; do
   [[ "$(git -C "$TMP/$channel/src" describe --tags)" == v1.2.3 ]]
 done
 
-# Run the prepare version guard with the upstream helper's failure modes.
+# Run the complete prepare source guard: helper failure modes plus the exact
+# EXPECTED_VERSION check (one leading v/V stripped on both sides, revision and
+# prerelease suffixes kept verbatim).
 for channel in stable testing; do
   guard="$(awk -v job="prepare_${channel}:" '
     $0 == "  " job { inside = 1 }
     inside && /if ! SOURCE_VERSION=/ { capture = 1 }
+    capture && /^      - name:/ { exit }
     capture { print }
-    capture && /^          fi$/ { exit }
   ' "$WORKFLOW")"
   [[ -n "$guard" ]]
-  for result in unknown empty failed valid; do
+  grep -Fq 'EXPECTED_VERSION' <<< "$guard"
+  printf 'FROM scratch\n' > "$TMP/$channel/src/Dockerfile"
+  export GITHUB_OUTPUT="$TMP/$channel/source-output"
+  # 名称|帮助器输出（- 表示帮助器失败）|期望版本|期望退出码
+  cases=(
+    'match|1.2.3-reF1nd.1|1.2.3-reF1nd.1|0'
+    'v_prefix|v1.2.3-reF1nd.1|1.2.3-reF1nd.1|0'
+    'upper_v_prefix|V1.2.3-reF1nd.1|v1.2.3-reF1nd.1|0'
+    'prerelease|1.2.3-rc.4-reF1nd.2|1.2.3-rc.4-reF1nd.2|0'
+    'mismatch|1.2.3|1.2.4|1'
+    'mismatch_revision|1.2.3-reF1nd.1|1.2.3-reF1nd.2|1'
+    'empty||1.2.3|1'
+    'unknown|unknown|1.2.3|1'
+    'helper_failed|-|1.2.3|1'
+  )
+  for entry in "${cases[@]}"; do
+    IFS='|' read -r name helper expected want <<< "$entry"
+    : > "$GITHUB_OUTPUT"
+    export EXPECTED_VERSION="$expected"
+    export CASE_HELPER="$helper"
     if (
       cd "$TMP/$channel"
       # Invoked by the extracted workflow in a child shell.
       # shellcheck disable=SC2317
       go() {
-        case "$result" in
-          unknown) echo unknown;;
-          empty) :;;
-          failed) return 1;;
-          valid) echo 1.2.3;;
-        esac
+        if [[ "$CASE_HELPER" == '-' ]]; then
+          return 1
+        elif [[ "$CASE_HELPER" == 'unknown' ]]; then
+          echo unknown
+        elif [[ -n "$CASE_HELPER" ]]; then
+          printf '%s\n' "$CASE_HELPER"
+        fi
       }
       export -f go
-      export result
       bash -eu -c "$guard"
-    ) >/dev/null 2>&1; then
-      [[ "$result" == valid ]]
+    ) >"$TMP/$channel/source.log" 2>&1; then
+      status=0
     else
-      [[ "$result" != valid ]]
+      status=$?
     fi
+    if [[ "$status" -ne "$want" ]]; then
+      echo "prepare_${channel} ${name}: expected exit ${want}, got ${status}" >&2
+      cat "$TMP/$channel/source.log" >&2
+      exit 1
+    fi
+    if [[ "$want" -ne 0 ]]; then
+      # 校验失败必须发生在 source_commit 输出之前。
+      assert_not_contains "$GITHUB_OUTPUT" 'source_commit'
+    fi
+    case "$name" in
+      mismatch*)
+        # 错误信息必须同时包含期望版本与实际版本。
+        assert_contains "$TMP/$channel/source.log" "$expected"
+        assert_contains "$TMP/$channel/source.log" "$helper"
+        ;;
+    esac
   done
 done
 
