@@ -3,10 +3,8 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 WORKFLOW="$ROOT/.github/workflows/build.yml"
-CI="$ROOT/.github/workflows/ci.yml"
 COMPOSE="$ROOT/docker-compose.yml"
 EBPF_COMPOSE="$ROOT/docker-compose.ebpf.yml"
-CLEANUP="$ROOT/.github/workflows/cleanup-workflow-runs.yml"
 README="$ROOT/README.md"
 
 assert_contains() {
@@ -41,16 +39,26 @@ assert_not_contains "$WORKFLOW" 'docker/login-action@v3'
 assert_not_contains "$WORKFLOW" 'docker/build-push-action@v6'
 assert_contains "$WORKFLOW" 'actions/checkout@11d5960a326750d5838078e36cf38b85af677262'
 
-# 自动版本检查每 6 小时运行一次，避免无必要的高频构建检查。
-# shellcheck disable=SC2016
-assert_contains "$WORKFLOW" 'cron: "0 */6 * * *"'
-assert_not_contains "$WORKFLOW" 'cron: "0 */1 * * *"'
+# Version checks and builds must only run on manual dispatch.
+assert_contains "$WORKFLOW" '  workflow_dispatch:'
+assert_not_contains "$WORKFLOW" 'schedule:'
+assert_not_contains "$WORKFLOW" 'cron:'
+assert_not_contains "$WORKFLOW" '  push:'
+assert_not_contains "$WORKFLOW" '  pull_request:'
+assert_not_contains "$WORKFLOW" '  repository_dispatch:'
+assert_not_contains "$WORKFLOW" '  workflow_call:'
+assert_not_contains "$WORKFLOW" '  workflow_run:'
+workflows=("$ROOT"/.github/workflows/*)
+[[ "${#workflows[@]}" -eq 1 && "${workflows[0]}" == "$WORKFLOW" ]] || {
+  echo 'only the manually triggered build workflow should remain' >&2
+  exit 1
+}
+[[ ! -e "$ROOT/tests/test-cleanup-policy.sh" ]]
 
-# 同一分支协调运行顺序，避免旧的定时运行使用过期 checkout 重写版本记录。
+# 同一分支协调运行顺序，避免旧运行使用过期 checkout 重写版本记录。
 # shellcheck disable=SC2016
 assert_contains "$WORKFLOW" 'group: build-${{ github.workflow }}-${{ github.ref }}'
-# shellcheck disable=SC2016
-assert_contains "$WORKFLOW" 'cancel-in-progress: ${{ github.event_name == '\''workflow_dispatch'\'' }}'
+assert_contains "$WORKFLOW" 'cancel-in-progress: true'
 assert_not_contains "$WORKFLOW" 'cancel-in-progress: false'
 # shellcheck disable=SC2016
 assert_contains "$WORKFLOW" 'ref: ${{ github.ref_name }}'
@@ -147,30 +155,8 @@ assert_contains "$EBPF_COMPOSE" '        hard: -1'
 assert_contains "$EBPF_COMPOSE" 'no-new-privileges:true'
 assert_contains "$EBPF_COMPOSE" 'restart: unless-stopped'
 
-# 清理仅针对已完成且超过保留期的运行，并保留最近一批记录。
-assert_contains "$CLEANUP" 'set -euo pipefail'
-assert_contains "$CLEANUP" 'status == "completed"'
-assert_contains "$CLEANUP" 'RETENTION_DAYS'
-assert_contains "$CLEANUP" 'KEEP_LATEST_RUNS'
-assert_contains "$CLEANUP" 'Keeping one of the latest'
-assert_contains "$CLEANUP" 'sort -r -k2,2'
-
-# 独立 CI 必须执行脚本、策略与 Compose 校验。
-assert_contains "$CI" 'tests/test-select-version.sh'
-assert_contains "$CI" 'tests/test-cleanup-policy.sh'
-assert_contains "$CI" 'tests/test-project.sh'
-assert_contains "$CI" 'shellcheck scripts/*.sh tests/*.sh'
-assert_contains "$CI" 'tests/test-prepare-ebpf-dockerfile.sh'
-assert_contains "$CI" 'tests/test-merge-channel-manifests.sh'
-assert_contains "$CI" 'actionlint .github/workflows/*.yml'
-assert_contains "$CI" 'sha256sum -c -'
-assert_not_contains "$CI" 'actions/checkout@v4'
-assert_contains "$CI" 'docker compose config --quiet'
-assert_contains "$CI" 'docker compose -f docker-compose.ebpf.yml config --quiet'
-
 # Shared version ordering and persistent state are part of the build contract.
 assert_contains "$WORKFLOW" 'source scripts/version-key.sh'
-assert_contains "$CI" "'docker-compose*.yml'"
 assert_contains "$COMPOSE" 'sing-box-data:/var/lib/sing-box'
 assert_contains "$EBPF_COMPOSE" 'sing-box-data:/var/lib/sing-box'
 assert_contains "$WORKFLOW" 'git -C src fetch --depth 1 --tags origin'
@@ -307,7 +293,6 @@ done
 # shellcheck disable=SC2016
 [[ "$(grep -Fc 'ref: ${{ github.ref_name }}' "$WORKFLOW")" -eq 1 ]]
 [[ "$(grep -Fc 'contents: write' "$WORKFLOW")" -eq 2 ]]
-assert_contains "$CI" 'tests/test-update-version-record.sh'
 
 # 仓库脚本必须以非可执行 100644 跟踪（以 Git 索引为准），确保任何推送方式都不依赖执行位。
 policy_modes="$(git -C "$ROOT" ls-files --stage -- 'scripts/*.sh' 'tests/*.sh')"
@@ -326,6 +311,8 @@ assert_not_contains "$README" '/opt/sing-box'
 assert_contains "$README" 'image: ghcr.io/cary17/sing-box:v1.14.0'
 assert_not_contains "$README" 'sha256:<manifest-digest>'
 assert_contains "$README" 'force_build'
+assert_contains "$README" 'Run workflow'
+assert_contains "$README" '不再定时检测上游'
 assert_not_contains "$README" 'eBPF'
 assert_not_contains "$README" 'with_ebpf'
 assert_not_contains "$README" 'CGO_ENABLED'

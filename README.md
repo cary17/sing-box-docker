@@ -1,6 +1,6 @@
 # reF1nd Sing-Box Docker
 
-自动构建 [reF1nd/sing-box](https://github.com/reF1nd/sing-box) 的 Stable 与 Testing 多架构镜像。
+手动触发检测并构建 [reF1nd/sing-box](https://github.com/reF1nd/sing-box) 的 Stable 与 Testing 多架构镜像。
 
 ## 镜像
 
@@ -46,4 +46,4 @@ docker compose up -d
 image: ghcr.io/cary17/sing-box:v1.14.0
 ```
 
-GitHub Actions 会自动检测 Stable/Testing 新版本；手动运行时可选择渠道并使用 `force_build` 强制构建。
+仅通过 GitHub Actions 手动触发检测与构建，不再定时检测上游。在 Actions 中选择 `Build reF1nd Sing-Box Docker Images`，点击 `Run workflow`，选择 Stable、Testing 或两者及对应上游分支。默认仅在检测到新版本时构建；勾选 `force_build` 可强制重建。
