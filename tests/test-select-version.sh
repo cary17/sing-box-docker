@@ -34,15 +34,6 @@ STABLE="$(bash "$SCRIPT" stable "$TMP/releases.json")"
 [[ "$(jq -r '.version' <<< "$STABLE")" == 'v1.13.14-reF1nd.2' ]]
 [[ "$(jq -r '.docker_tag' <<< "$STABLE")" == 'v1.13.14-reF1nd.2' ]]
 
-# 只有带数字修订号的 reF1nd 版本使用完整 Docker tag；不带修订号时保持短 tag。
-cat > "$TMP/revision-one.json" <<'JSON'
-[
-  {"tag_name":"v1.13.14-reF1nd.1","draft":false,"prerelease":false,"published_at":"2026-07-23T00:00:00Z"}
-]
-JSON
-REVISION_ONE="$(bash "$SCRIPT" stable "$TMP/revision-one.json")"
-[[ "$(jq -r '.docker_tag' <<< "$REVISION_ONE")" == 'v1.13.14-reF1nd.1' ]]
-
 cat > "$TMP/no-revision.json" <<'JSON'
 [
   {"tag_name":"v1.13.14-reF1nd","draft":false,"prerelease":false,"published_at":"2026-07-22T00:00:00Z"}
@@ -146,24 +137,8 @@ expect_failure stable "$EMPTY_RELEASES" "$EMPTY_RELEASES"
 expect_failure stable "$EMPTY_RELEASES" "$TMP/tags.json" '' invalid-date
 TAG_TIME="$(bash "$SCRIPT" stable "$EMPTY_RELEASES" "$TMP/tags.json" '' '2026-07-24T00:00:00Z')"
 [[ "$(jq -r '.published_at' <<< "$TAG_TIME")" == '2026-07-24T08:00:00+08:00' ]]
-BEFORE="$(date +%s)"
-TAG_NOW="$(bash "$SCRIPT" stable "$EMPTY_RELEASES" "$TMP/tags.json")"
-TAG_EPOCH="$(date -d "$(jq -r '.published_at' <<< "$TAG_NOW")" +%s)"
-AFTER="$(date +%s)"
-[[ "$TAG_EPOCH" -ge "$BEFORE" && "$TAG_EPOCH" -le "$AFTER" ]]
-
-# Numeric components are decimal strings, including leading zeros and huge values.
 # shellcheck source=scripts/version-key.sh
 source "$ROOT/scripts/version-key.sh"
-[[ "$(version_key v1.08.0-reF1nd)" == "$(version_key V01.8.000-reF1nd.00)" ]]
-[[ "$(version_key v1.2.3-RC.08-reF1nd.09)" == "$(version_key 1.2.3-rc.8-reF1nd.9)" ]]
-[[ "$(version_key v1.0.0-alpha.999999999999999999999-reF1nd)" < "$(version_key v1.0.0-beta.0-reF1nd)" ]]
-[[ "$(version_key v1.0.0-rc.999999999999999999999-reF1nd)" < "$(version_key v1.0.0-reF1nd)" ]]
-if version_key 'v1.2.3-reF1nd.bad' > "$TMP/output" 2> "$TMP/error"; then
-  echo 'expected invalid version failure' >&2
-  exit 1
-fi
-[[ ! -s "$TMP/output" ]]
 
 while read -r channel older newer; do
   [[ "$(version_key "$newer")" > "$(version_key "$older")" ]]

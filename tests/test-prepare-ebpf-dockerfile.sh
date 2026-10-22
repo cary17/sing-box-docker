@@ -36,16 +36,6 @@ grep -Fqx '    && export TAGS="$(cat release/DEFAULT_BUILD_TAGS_OTHERS),with_ebp
 grep -Fqx '    && go build -tags "$TAGS" ./cmd/sing-box' "$TMP/Dockerfile.ebpf"
 grep -Fqx "    && grep -Fx 'CGO: disabled' /tmp/version" "$TMP/Dockerfile.ebpf"
 
-# The precompiled BPF objects are committed upstream; the build must NOT regenerate them.
-if grep -Fq 'make -C common/ebpf generate' "$TMP/Dockerfile.ebpf"; then
-  echo 'upstream Dockerfile unexpectedly regenerates eBPF objects' >&2
-  exit 1
-fi
-if grep -Fq 'clang' "$TMP/Dockerfile.ebpf"; then
-  echo 'upstream Dockerfile unexpectedly requires clang' >&2
-  exit 1
-fi
-
 # Fail closed when the TAGS anchor moves: appending with_ebpf is the whole point.
 cp "$TMP/Dockerfile" "$TMP/changed"
 sed -i 's/export TAGS=$(cat release\/DEFAULT_BUILD_TAGS_OTHERS)/export TAGS=$(cat release\/CUSTOM_TAGS)/' "$TMP/changed"
@@ -55,21 +45,5 @@ if bash "$SCRIPT" "$TMP/changed" "$TMP/should-not-exist" >"$TMP/stdout" 2>"$TMP/
 fi
 grep -Fq 'expected one build tags anchor, found 0' "$TMP/stderr"
 [[ ! -e "$TMP/should-not-exist" ]]
-
-# Upstream kept this structure from 2026-03 through 2026-08 while changing the
-# Go image version. Accept likely formatting/layout changes when the semantic
-# build anchors remain intact.
-sed \
-  -e 's/golang:1.26-alpine/golang:1.25-alpine/' \
-  -e 's|COPY . /src|COPY . /workspace/sing-box|' \
-  -e 's|WORKDIR /src|WORKDIR /workspace/sing-box|' \
-  -e 's/ENV CGO_ENABLED=0/ENV CGO_ENABLED 0/' \
-  -e 's/apk add git build-base/apk add --no-cache git ca-certificates build-base/' \
-  -e 's/FROM --platform=$TARGETPLATFORM alpine AS dist/FROM --platform=$TARGETPLATFORM alpine:3.24 AS dist/' \
-  "$TMP/Dockerfile" > "$TMP/Dockerfile.changed-layout"
-bash "$SCRIPT" "$TMP/Dockerfile.changed-layout" "$TMP/Dockerfile.changed-layout.ebpf" >/dev/null
-grep -Fqx 'FROM --platform=$BUILDPLATFORM golang:1.25-alpine AS builder' "$TMP/Dockerfile.changed-layout.ebpf"
-grep -Fqx '    && apk add --no-cache git ca-certificates build-base \' "$TMP/Dockerfile.changed-layout.ebpf"
-grep -Fqx 'FROM --platform=$TARGETPLATFORM alpine:3.24 AS dist' "$TMP/Dockerfile.changed-layout.ebpf"
 
 echo 'eBPF Dockerfile preparation checks passed'

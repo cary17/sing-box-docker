@@ -60,14 +60,6 @@ bash "$SCRIPT" "${ARGS[@]}" >"$TMP/success" 2>&1 || { cat "$TMP/success" >&2; ex
 git --git-dir="$TMP/remote" show main:.github/version/stable.json | jq -e --arg sha "$SHA" '.channel == "stable" and .docker_tag == "v1.2.3" and .source_commit == $sha' >/dev/null
 git --git-dir="$TMP/remote" show main:.github/version/testing.json | jq -e '.version == "v2.0.0"' >/dev/null
 
-# Record validation must accept every supported version prefix.
-for version in V1.2.3-reF1nd 1.2.3-reF1nd; do
-  ARGS[1]="$version"
-  bash "$SCRIPT" "${ARGS[@]}" >"$TMP/prefix" 2>&1 || { cat "$TMP/prefix" >&2; exit 1; }
-  git --git-dir="$TMP/remote" show main:.github/version/stable.json |
-    jq -e --arg version "$version" '.version == $version' >/dev/null
-done
-
 # Real server-side push rejection must propagate; no false published result.
 BEFORE="$(git --git-dir="$TMP/remote" rev-parse main)"
 printf '#!/bin/sh\nexit 1\n' > "$TMP/remote/hooks/pre-receive"

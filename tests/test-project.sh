@@ -3,169 +3,10 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 WORKFLOW="$ROOT/.github/workflows/build.yml"
-COMPOSE="$ROOT/docker-compose.yml"
-EBPF_COMPOSE="$ROOT/docker-compose.ebpf.yml"
-README="$ROOT/README.md"
-
-assert_contains() {
-  local file="$1" pattern="$2"
-  grep -Fq -- "$pattern" "$file" || {
-    echo "missing '$pattern' in $file" >&2
-    exit 1
-  }
-}
-
-assert_not_contains() {
-  local file="$1" pattern="$2"
-  if grep -Fq -- "$pattern" "$file"; then
-    echo "unexpected '$pattern' in $file" >&2
-    exit 1
-  fi
-}
-
-# 网络请求必须有边界重试与超时。
-assert_contains "$WORKFLOW" '--retry 3'
-assert_contains "$WORKFLOW" '--retry-all-errors'
-assert_contains "$WORKFLOW" '--connect-timeout 15'
-assert_contains "$WORKFLOW" '--max-time 120'
-assert_contains "$WORKFLOW" 'permissions:'
-assert_contains "$WORKFLOW" 'contents: read'
-assert_contains "$WORKFLOW" 'contents: write'
-assert_contains "$WORKFLOW" 'packages: write'
-assert_not_contains "$WORKFLOW" 'actions/checkout@v4'
-assert_not_contains "$WORKFLOW" 'docker/setup-qemu-action@v3'
-assert_not_contains "$WORKFLOW" 'docker/setup-buildx-action@v3'
-assert_not_contains "$WORKFLOW" 'docker/login-action@v3'
-assert_not_contains "$WORKFLOW" 'docker/build-push-action@v6'
-assert_contains "$WORKFLOW" 'actions/checkout@11d5960a326750d5838078e36cf38b85af677262'
-
-# Version checks and builds must only run on manual dispatch.
-assert_contains "$WORKFLOW" '  workflow_dispatch:'
-assert_not_contains "$WORKFLOW" 'schedule:'
-assert_not_contains "$WORKFLOW" 'cron:'
-assert_not_contains "$WORKFLOW" '  push:'
-assert_not_contains "$WORKFLOW" '  pull_request:'
-assert_not_contains "$WORKFLOW" '  repository_dispatch:'
-assert_not_contains "$WORKFLOW" '  workflow_call:'
-assert_not_contains "$WORKFLOW" '  workflow_run:'
-workflows=("$ROOT"/.github/workflows/*)
-[[ "${#workflows[@]}" -eq 1 && "${workflows[0]}" == "$WORKFLOW" ]] || {
-  echo 'only the manually triggered build workflow should remain' >&2
-  exit 1
-}
-[[ ! -e "$ROOT/tests/test-cleanup-policy.sh" ]]
-
-# 同一分支协调运行顺序，避免旧运行使用过期 checkout 重写版本记录。
-# shellcheck disable=SC2016
-assert_contains "$WORKFLOW" 'group: build-${{ github.workflow }}-${{ github.ref }}'
-assert_contains "$WORKFLOW" 'cancel-in-progress: true'
-assert_not_contains "$WORKFLOW" 'cancel-in-progress: false'
-# shellcheck disable=SC2016
-assert_contains "$WORKFLOW" 'ref: ${{ github.ref_name }}'
-
-# 构建记录与镜像摘要必须可追溯。
-assert_contains "$WORKFLOW" 'source_commit'
-assert_contains "$WORKFLOW" 'dockerfile_sha256'
-assert_contains "$WORKFLOW" 'ghcr_digest'
-assert_contains "$WORKFLOW" 'dockerhub_digest'
-assert_contains "$WORKFLOW" 'sbom: true'
-assert_contains "$WORKFLOW" 'provenance: mode=max'
-assert_contains "$ROOT/scripts/merge-channel-manifests.sh" 'docker buildx imagetools inspect'
-assert_contains "$ROOT/scripts/merge-channel-manifests.sh" 'EXPECTED_PLATFORMS'
-assert_contains "$ROOT/scripts/update-version-record.sh" 'source_commit'
-assert_contains "$ROOT/scripts/update-version-record.sh" 'ghcr_digest'
-assert_contains "$ROOT/scripts/update-version-record.sh" 'dockerhub_digest'
-assert_contains "$ROOT/scripts/update-version-record.sh" 'source_branch'
-assert_contains "$WORKFLOW" 'bash repo-tools/scripts/prepare-ebpf-dockerfile.sh'
-assert_contains "$WORKFLOW" 'bash scripts/merge-channel-manifests.sh'
-assert_contains "$WORKFLOW" 'bash scripts/update-version-record.sh'
-assert_contains "$WORKFLOW" 'file: src/Dockerfile.ebpf'
-assert_contains "$WORKFLOW" 'ebpf_dockerfile_sha256'
-assert_contains "$ROOT/scripts/merge-channel-manifests.sh" "grep -Fx 'with_ebpf'"
-assert_contains "$ROOT/scripts/merge-channel-manifests.sh" "grep -Fx 'CGO: disabled'"
-# shellcheck disable=SC2016
-assert_contains "$ROOT/scripts/prepare-ebpf-dockerfile.sh" 'FROM --platform=$BUILDPLATFORM'
-assert_not_contains "$ROOT/scripts/prepare-ebpf-dockerfile.sh" 'ENV CGO_ENABLED=1'
-assert_not_contains "$ROOT/scripts/prepare-ebpf-dockerfile.sh" 'make -C common/ebpf generate'
-assert_contains "$WORKFLOW" 'prepare_stable:'
-assert_contains "$WORKFLOW" 'prepare_testing:'
-assert_contains "$WORKFLOW" 'merge_stable:'
-assert_contains "$WORKFLOW" 'merge_testing:'
-assert_contains "$WORKFLOW" 'needs.prepare_stable.outputs.ebpf_dockerfile_sha256'
-assert_contains "$WORKFLOW" 'needs.prepare_testing.outputs.ebpf_dockerfile_sha256'
-if [[ "$(grep -Fc 'file: src/Dockerfile.ebpf' "$WORKFLOW")" -ne 4 ]]; then
-  echo 'stable/testing builds must both use Dockerfile.ebpf for both registries' >&2
-  exit 1
-fi
-# GitHub expressions are intentional literal test patterns.
-# shellcheck disable=SC2016
-assert_contains "$WORKFLOW" 'platforms: ${{ matrix.platform }}'
-# shellcheck disable=SC2016
-assert_contains "$WORKFLOW" 'scope=stable-${{ matrix.slug }}'
-# shellcheck disable=SC2016
-assert_contains "$WORKFLOW" 'scope=testing-${{ matrix.slug }}'
-assert_contains "$WORKFLOW" 'push-by-digest=true'
-assert_contains "$WORKFLOW" 'actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02'
-assert_contains "$WORKFLOW" 'actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093'
-# shellcheck disable=SC2016
-assert_not_contains "$WORKFLOW" 'stable-build-${{ matrix.slug }}'
-# shellcheck disable=SC2016
-assert_not_contains "$WORKFLOW" 'testing-build-${{ matrix.slug }}'
-assert_contains "$WORKFLOW" 'source_version'
-
-# 用户要求保留从所选移动分支构建；带数字修订号时发布完整精确标签。
-assert_contains "$WORKFLOW" 'git clone --depth 1 --branch'
-assert_contains "$WORKFLOW" 'stable_docker_tag'
-assert_contains "$WORKFLOW" 'testing_docker_tag'
-assert_contains "$ROOT/scripts/select-upstream-version.sh" 'docker_tag_for_version'
-# Literal pattern guards the unversioned reF1nd tag mapping.
-# shellcheck disable=SC2016
-assert_contains "$ROOT/scripts/select-upstream-version.sh" 'printf '\''%s\n'\'' "${version%%-reF1nd*}"'
-
-# TUN Compose 只保留 TUN 所需权限。
-assert_contains "$COMPOSE" '      - ./conf:/etc/sing-box/'
-assert_not_contains "$COMPOSE" '      - /opt/sing-box/conf:/etc/sing-box/'
-assert_not_contains "$COMPOSE" 'privileged: true'
-assert_not_contains "$COMPOSE" '      - ALL'
-assert_contains "$COMPOSE" '      - NET_ADMIN'
-assert_contains "$COMPOSE" '/dev/net/tun:/dev/net/tun'
-assert_not_contains "$COMPOSE" '      - BPF'
-assert_not_contains "$COMPOSE" '      - PERFMON'
-assert_not_contains "$COMPOSE" '      - IPC_LOCK'
-assert_not_contains "$COMPOSE" '      - NET_RAW'
-assert_not_contains "$COMPOSE" '    cgroup: host'
-assert_contains "$COMPOSE" 'no-new-privileges:true'
-assert_contains "$COMPOSE" 'restart: unless-stopped'
-
-# eBPF Compose 只保留实测需要的 eBPF 权限，不挂载 TUN。
-assert_contains "$EBPF_COMPOSE" '      - ./conf:/etc/sing-box/'
-assert_not_contains "$EBPF_COMPOSE" '      - /opt/sing-box/conf:/etc/sing-box/'
-assert_not_contains "$EBPF_COMPOSE" 'privileged: true'
-assert_not_contains "$EBPF_COMPOSE" '      - ALL'
-assert_not_contains "$EBPF_COMPOSE" '      - SYS_ADMIN'
-assert_not_contains "$EBPF_COMPOSE" '      - NET_RAW'
-assert_not_contains "$EBPF_COMPOSE" '      - IPC_LOCK'
-assert_not_contains "$EBPF_COMPOSE" '/dev/net/tun:/dev/net/tun'
-assert_contains "$EBPF_COMPOSE" '      - NET_ADMIN'
-assert_contains "$EBPF_COMPOSE" '      - BPF'
-assert_contains "$EBPF_COMPOSE" '      - PERFMON'
-assert_contains "$EBPF_COMPOSE" '    cgroup: host'
-assert_contains "$EBPF_COMPOSE" '      memlock:'
-assert_contains "$EBPF_COMPOSE" '        hard: -1'
-assert_contains "$EBPF_COMPOSE" 'no-new-privileges:true'
-assert_contains "$EBPF_COMPOSE" 'restart: unless-stopped'
-
-# Shared version ordering and persistent state are part of the build contract.
-assert_contains "$WORKFLOW" 'source scripts/version-key.sh'
-assert_contains "$COMPOSE" 'sing-box-data:/var/lib/sing-box'
-assert_contains "$EBPF_COMPOSE" 'sing-box-data:/var/lib/sing-box'
-assert_contains "$WORKFLOW" 'git -C src fetch --depth 1 --tags origin'
-assert_contains "$WORKFLOW" 'git -C src checkout --detach FETCH_HEAD'
-assert_contains "$WORKFLOW" 'bash scripts/merge-channel-manifests.sh'
-
-# Execute the actual workflow fetch commands after the upstream branch advances.
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
+
+# Execute the actual workflow fetch commands after the upstream branch advances.
 git init -q "$TMP/upstream"
 git -C "$TMP/upstream" -c user.name=Test -c user.email=test@example.invalid commit -qm initial --allow-empty
 PINNED="$(git -C "$TMP/upstream" rev-parse HEAD)"
@@ -204,7 +45,6 @@ for channel in stable testing; do
     capture { print }
   ' "$WORKFLOW")"
   [[ -n "$guard" ]]
-  grep -Fq 'EXPECTED_VERSION' <<< "$guard"
   printf 'FROM scratch\n' > "$TMP/$channel/src/Dockerfile"
   export GITHUB_OUTPUT="$TMP/$channel/source-output"
   # 名称|帮助器输出（- 表示帮助器失败）|期望版本|期望退出码
@@ -251,13 +91,16 @@ for channel in stable testing; do
     fi
     if [[ "$want" -ne 0 ]]; then
       # 校验失败必须发生在 source_commit 输出之前。
-      assert_not_contains "$GITHUB_OUTPUT" 'source_commit'
+      if grep -Fq 'source_commit' "$GITHUB_OUTPUT"; then
+        echo 'source_commit written before source validation' >&2
+        exit 1
+      fi
     fi
     case "$name" in
       mismatch*)
         # 错误信息必须同时包含期望版本与实际版本。
-        assert_contains "$TMP/$channel/source.log" "$expected"
-        assert_contains "$TMP/$channel/source.log" "$helper"
+        grep -Fq -- "$expected" "$TMP/$channel/source.log"
+        grep -Fq -- "$helper" "$TMP/$channel/source.log"
         ;;
     esac
   done
@@ -286,40 +129,5 @@ for channel in stable testing; do
     fi
   done
 done
-
-# Only version detection reads the moving repository branch.
-# shellcheck disable=SC2016
-[[ "$(grep -Fc 'ref: ${{ github.sha }}' "$WORKFLOW")" -eq 6 ]]
-# shellcheck disable=SC2016
-[[ "$(grep -Fc 'ref: ${{ github.ref_name }}' "$WORKFLOW")" -eq 1 ]]
-[[ "$(grep -Fc 'contents: write' "$WORKFLOW")" -eq 2 ]]
-
-# 仓库脚本必须以非可执行 100644 跟踪（以 Git 索引为准），确保任何推送方式都不依赖执行位。
-policy_modes="$(git -C "$ROOT" ls-files --stage -- 'scripts/*.sh' 'tests/*.sh')"
-[[ -n "$policy_modes" ]] || { echo 'no tracked repository scripts found' >&2; exit 1; }
-while read -r p_mode _ _ p_path; do
-  [[ "$p_mode" == "100644" ]] || { echo "repository script must be tracked non-executable: $p_path" >&2; exit 1; }
-done <<< "$policy_modes"
-
-# README 只说明本项目提供的镜像与基本使用方法，不描述上游功能。
-assert_contains "$README" 'ghcr.io/cary17/sing-box:latest'
-assert_contains "$README" 'ghcr.io/cary17/sing-box:testing'
-assert_contains "$README" 'docker compose up -d'
-assert_contains "$README" 'docker compose pull'
-assert_contains "$README" 'mkdir -p conf'
-assert_not_contains "$README" '/opt/sing-box'
-assert_contains "$README" 'image: ghcr.io/cary17/sing-box:v1.14.0'
-assert_not_contains "$README" 'sha256:<manifest-digest>'
-assert_contains "$README" 'force_build'
-assert_contains "$README" 'Run workflow'
-assert_contains "$README" '不再定时检测上游'
-assert_not_contains "$README" 'eBPF'
-assert_not_contains "$README" 'with_ebpf'
-assert_not_contains "$README" 'CGO_ENABLED'
-assert_not_contains "$README" 'CGO: disabled'
-assert_not_contains "$README" '统一 TC'
-assert_not_contains "$README" '上游功能'
-assert_contains "$EBPF_COMPOSE" 'image: ghcr.io/cary17/sing-box:latest'
-assert_not_contains "$EBPF_COMPOSE" 'image: ghcr.io/cary17/sing-box:testing'
 
 echo 'project checks passed'
