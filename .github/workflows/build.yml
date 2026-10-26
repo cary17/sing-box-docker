@@ -8,6 +8,11 @@ on:
         required: false
         default: false
         type: boolean
+      version:
+        description: "指定版本（如 1.14.4 或 v1.15.0-alpha.13-reF1nd；留空检测最新）"
+        required: false
+        default: ""
+        type: string
       branch:
         description: "选择分支"
         required: false
@@ -60,6 +65,7 @@ jobs:
     name: 检测上游版本
     runs-on: ubuntu-latest
     outputs:
+      requested_version: ${{ steps.build_request.outputs.version }}
       stable_version: ${{ steps.stable_version.outputs.version }}
       stable_published_at: ${{ steps.stable_version.outputs.published_at }}
       stable_docker_tag: ${{ steps.stable_version.outputs.docker_tag }}
@@ -74,6 +80,33 @@ jobs:
         with:
           ref: ${{ github.ref_name }}
           fetch-depth: 0
+
+      - name: 解析构建版本与渠道
+        id: build_request
+        env:
+          REQUESTED_VERSION: ${{ github.event.inputs.version }}
+          SELECTED_BRANCH: ${{ github.event.inputs.branch || 'both' }}
+        run: |
+          CHANNEL="$SELECTED_BRANCH"
+          if [[ -n "$REQUESTED_VERSION" ]]; then
+            REQUESTED_VERSION="v${REQUESTED_VERSION#[vV]}"
+            if [[ "$REQUESTED_VERSION" != *-reF1nd* ]]; then
+              REQUESTED_VERSION="${REQUESTED_VERSION}-reF1nd"
+            fi
+            source scripts/version-key.sh
+            version_key "$REQUESTED_VERSION" >/dev/null
+            BASE_VERSION="${REQUESTED_VERSION%%-reF1nd*}"
+            CHANNEL=stable
+            [[ "$BASE_VERSION" != *-* ]] || CHANNEL=testing
+            if [[ "$SELECTED_BRANCH" != both && "$SELECTED_BRANCH" != "$CHANNEL" ]]; then
+              echo "指定版本 $REQUESTED_VERSION 属于 $CHANNEL，与所选渠道 $SELECTED_BRANCH 不匹配" >&2
+              exit 1
+            fi
+          fi
+          {
+            echo "channel=$CHANNEL"
+            echo "version=$REQUESTED_VERSION"
+          } >> "$GITHUB_OUTPUT"
 
       - name: 读取稳定版记录
         id: stable_local
@@ -95,12 +128,18 @@ jobs:
 
       - name: 获取稳定版版本号
         id: stable_version
+        if: steps.build_request.outputs.channel == 'both' || steps.build_request.outputs.channel == 'stable'
         env:
           LOCAL_VERSION: ${{ steps.stable_local.outputs.version }}
+          REQUESTED_VERSION: ${{ steps.build_request.outputs.version }}
         run: |
           RELEASES_JSON="$RUNNER_TEMP/stable-releases.json"
           TAGS_JSON="$RUNNER_TEMP/stable-tags.json"
           TAG_PUBLISHED_AT="$(TZ=Asia/Shanghai date +'%Y-%m-%dT%H:%M:%S+08:00')"
+          RELEASES_URL="https://api.github.com/repos/${{ env.UPSTREAM_RELEASES_REPO }}/releases?per_page=100"
+          if [[ -n "$REQUESTED_VERSION" ]]; then
+            RELEASES_URL="https://api.github.com/repos/${{ env.UPSTREAM_RELEASES_REPO }}/releases/tags/$REQUESTED_VERSION"
+          fi
 
           curl -fsSL \
             --retry 3 \
@@ -111,10 +150,10 @@ jobs:
             -H "Accept: application/vnd.github+json" \
             -H "Authorization: Bearer ${{ github.token }}" \
             -H "X-GitHub-Api-Version: 2022-11-28" \
-            "https://api.github.com/repos/${{ env.UPSTREAM_RELEASES_REPO }}/releases?per_page=100" \
+            "$RELEASES_URL" \
             -o "$RELEASES_JSON"
 
-          if SELECTED="$(bash scripts/select-upstream-version.sh stable "$RELEASES_JSON" "" "$LOCAL_VERSION" "$TAG_PUBLISHED_AT")"; then
+          if SELECTED="$(bash scripts/select-upstream-version.sh stable "$RELEASES_JSON" "" "$LOCAL_VERSION" "$TAG_PUBLISHED_AT" "$REQUESTED_VERSION")"; then
             :
           else
             STATUS=$?
@@ -134,7 +173,7 @@ jobs:
               "https://api.github.com/repos/${{ env.UPSTREAM_RELEASES_REPO }}/tags?per_page=100" \
               -o "$TAGS_JSON"
 
-            SELECTED="$(bash scripts/select-upstream-version.sh stable "$RELEASES_JSON" "$TAGS_JSON" "$LOCAL_VERSION" "$TAG_PUBLISHED_AT")"
+            SELECTED="$(bash scripts/select-upstream-version.sh stable "$RELEASES_JSON" "$TAGS_JSON" "$LOCAL_VERSION" "$TAG_PUBLISHED_AT" "$REQUESTED_VERSION")"
           fi
 
           VERSION="$(jq -r '.version' <<< "$SELECTED")"
@@ -154,7 +193,9 @@ jobs:
 
       - name: 检查稳定版是否需要构建
         id: stable_check
+        if: steps.build_request.outputs.channel == 'both' || steps.build_request.outputs.channel == 'stable'
         env:
+          REQUESTED_VERSION: ${{ steps.build_request.outputs.version }}
           SELECTED_BRANCH: ${{ github.event.inputs.branch || 'both' }}
           CURRENT: ${{ steps.stable_version.outputs.version }}
           LOCAL: ${{ steps.stable_local.outputs.version }}
@@ -164,12 +205,15 @@ jobs:
           source scripts/version-key.sh
           CURRENT_KEY="$(version_key "$CURRENT")"
           LOCAL_KEY=""
-          if [[ -n "$LOCAL" ]]; then
+          if [[ -n "$LOCAL" && -z "${REQUESTED_VERSION:-}" ]]; then
             LOCAL_KEY="$(version_key "$LOCAL")"
           fi
 
           if [[ "$SELECTED_BRANCH" != "both" && "$SELECTED_BRANCH" != "stable" ]]; then
             echo "手动触发选择了 ${SELECTED_BRANCH}，跳过稳定版"
+          elif [[ -n "$REQUESTED_VERSION" ]]; then
+            NEED="true"
+            echo "构建指定稳定版 $CURRENT"
           elif [[ "${{ github.event.inputs.force_build }}" == "true" ]]; then
             NEED="true"
             echo "强制构建稳定版"
@@ -206,12 +250,18 @@ jobs:
 
       - name: 获取测试版版本号
         id: testing_version
+        if: steps.build_request.outputs.channel == 'both' || steps.build_request.outputs.channel == 'testing'
         env:
           LOCAL_VERSION: ${{ steps.testing_local.outputs.version }}
+          REQUESTED_VERSION: ${{ steps.build_request.outputs.version }}
         run: |
           RELEASES_JSON="$RUNNER_TEMP/testing-releases.json"
           TAGS_JSON="$RUNNER_TEMP/testing-tags.json"
           TAG_PUBLISHED_AT="$(TZ=Asia/Shanghai date +'%Y-%m-%dT%H:%M:%S+08:00')"
+          RELEASES_URL="https://api.github.com/repos/${{ env.UPSTREAM_RELEASES_REPO }}/releases?per_page=100"
+          if [[ -n "$REQUESTED_VERSION" ]]; then
+            RELEASES_URL="https://api.github.com/repos/${{ env.UPSTREAM_RELEASES_REPO }}/releases/tags/$REQUESTED_VERSION"
+          fi
 
           curl -fsSL \
             --retry 3 \
@@ -222,10 +272,10 @@ jobs:
             -H "Accept: application/vnd.github+json" \
             -H "Authorization: Bearer ${{ github.token }}" \
             -H "X-GitHub-Api-Version: 2022-11-28" \
-            "https://api.github.com/repos/${{ env.UPSTREAM_RELEASES_REPO }}/releases?per_page=100" \
+            "$RELEASES_URL" \
             -o "$RELEASES_JSON"
 
-          if SELECTED="$(bash scripts/select-upstream-version.sh testing "$RELEASES_JSON" "" "$LOCAL_VERSION" "$TAG_PUBLISHED_AT")"; then
+          if SELECTED="$(bash scripts/select-upstream-version.sh testing "$RELEASES_JSON" "" "$LOCAL_VERSION" "$TAG_PUBLISHED_AT" "$REQUESTED_VERSION")"; then
             :
           else
             STATUS=$?
@@ -245,7 +295,7 @@ jobs:
               "https://api.github.com/repos/${{ env.UPSTREAM_RELEASES_REPO }}/tags?per_page=100" \
               -o "$TAGS_JSON"
 
-            SELECTED="$(bash scripts/select-upstream-version.sh testing "$RELEASES_JSON" "$TAGS_JSON" "$LOCAL_VERSION" "$TAG_PUBLISHED_AT")"
+            SELECTED="$(bash scripts/select-upstream-version.sh testing "$RELEASES_JSON" "$TAGS_JSON" "$LOCAL_VERSION" "$TAG_PUBLISHED_AT" "$REQUESTED_VERSION")"
           fi
 
           VERSION="$(jq -r '.version' <<< "$SELECTED")"
@@ -265,7 +315,9 @@ jobs:
 
       - name: 检查测试版是否需要构建
         id: testing_check
+        if: steps.build_request.outputs.channel == 'both' || steps.build_request.outputs.channel == 'testing'
         env:
+          REQUESTED_VERSION: ${{ steps.build_request.outputs.version }}
           SELECTED_BRANCH: ${{ github.event.inputs.branch || 'both' }}
           CURRENT: ${{ steps.testing_version.outputs.version }}
           LOCAL: ${{ steps.testing_local.outputs.version }}
@@ -275,12 +327,15 @@ jobs:
           source scripts/version-key.sh
           CURRENT_KEY="$(version_key "$CURRENT")"
           LOCAL_KEY=""
-          if [[ -n "$LOCAL" ]]; then
+          if [[ -n "$LOCAL" && -z "${REQUESTED_VERSION:-}" ]]; then
             LOCAL_KEY="$(version_key "$LOCAL")"
           fi
 
           if [[ "$SELECTED_BRANCH" != "both" && "$SELECTED_BRANCH" != "testing" ]]; then
             echo "手动触发选择了 ${SELECTED_BRANCH}，跳过测试版"
+          elif [[ -n "$REQUESTED_VERSION" ]]; then
+            NEED="true"
+            echo "构建指定测试版 $CURRENT"
           elif [[ "${{ github.event.inputs.force_build }}" == "true" ]]; then
             NEED="true"
             echo "强制构建测试版"
@@ -602,9 +657,10 @@ jobs:
         run: |
           bash scripts/merge-channel-manifests.sh stable \
             "${{ needs.check_versions.outputs.stable_docker_tag }}" \
-            "${{ env.GHCR_IMAGE }}" "${{ env.DOCKERHUB_IMAGE }}" "latest,stable" \
+            "${{ env.GHCR_IMAGE }}" "${{ env.DOCKERHUB_IMAGE }}" "${{ needs.check_versions.outputs.requested_version == '' && 'latest,stable' || '' }}" \
             "$RUNNER_TEMP/digests" "${{ needs.prepare_stable.outputs.source_version }}"
       - name: 更新稳定版版本记录
+        if: needs.check_versions.outputs.requested_version == ''
         run: |
           bash scripts/update-version-record.sh stable \
             "${{ needs.check_versions.outputs.stable_version }}" \
@@ -657,9 +713,10 @@ jobs:
         run: |
           bash scripts/merge-channel-manifests.sh testing \
             "${{ needs.check_versions.outputs.testing_docker_tag }}" \
-            "${{ env.GHCR_IMAGE }}" "${{ env.DOCKERHUB_IMAGE }}" "testing" \
+            "${{ env.GHCR_IMAGE }}" "${{ env.DOCKERHUB_IMAGE }}" "${{ needs.check_versions.outputs.requested_version == '' && 'testing' || '' }}" \
             "$RUNNER_TEMP/digests" "${{ needs.prepare_testing.outputs.source_version }}"
       - name: 更新测试版版本记录
+        if: needs.check_versions.outputs.requested_version == ''
         run: |
           bash scripts/update-version-record.sh testing \
             "${{ needs.check_versions.outputs.testing_version }}" \

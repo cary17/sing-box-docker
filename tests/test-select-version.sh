@@ -170,4 +170,22 @@ else
   [[ "$?" -eq 3 && ! -s "$TMP/output" ]]
 fi
 
+# Explicit releases may be older than the local record and must never fall back.
+jq -s 'add' "$TMP/no-revision.json" "$TMP/releases.json" > "$TMP/all-releases.json"
+for local_version in v1.13.14-reF1nd v1.13.14-reF1nd.2 invalid; do
+  PINNED="$(bash "$SCRIPT" stable "$TMP/all-releases.json" "$TMP/tags.json" "$local_version" now v1.13.14-reF1nd)"
+  [[ "$(jq -r '.version' <<< "$PINNED")" == v1.13.14-reF1nd ]]
+  [[ "$(jq -r '.docker_tag' <<< "$PINNED")" == v1.13.14 ]]
+  [[ "$(jq -r '.source' <<< "$PINNED")" == release ]]
+done
+# The exact-release API returns an object rather than the releases-list array.
+jq '.[0]' "$TMP/testing-revision.json" > "$TMP/exact-release.json"
+PINNED="$(bash "$SCRIPT" testing "$TMP/exact-release.json" '' '' now v1.14.0-rc.4-reF1nd.2)"
+[[ "$(jq -r '.docker_tag' <<< "$PINNED")" == v1.14.0-rc.4-reF1nd.2 ]]
+expect_failure stable "$TMP/all-releases.json" "$TMP/tags.json" '' now v1.0.0-reF1nd
+expect_failure stable "$TMP/exact-release.json" "$TMP/tags.json" '' now v1.14.0-rc.4-reF1nd.2
+expect_failure stable "$TMP/all-releases.json" "$TMP/tags.json" '' now '../invalid'
+jq '.[0] | .draft = true' "$TMP/no-revision.json" > "$TMP/pinned-draft.json"
+expect_failure stable "$TMP/pinned-draft.json" "$TMP/tags.json" '' now v1.13.14-reF1nd
+
 echo 'version selection tests passed'

@@ -94,6 +94,17 @@ if grep -Fq -- '-t ghcr.test/sing-box:v1.2.3-rc.4 ' "$MOCK_LOG"; then
   exit 1
 fi
 
+# Explicit-version builds publish only the version tag, without channel aliases.
+for channel in stable testing; do
+  : > "$MOCK_LOG"
+  bash "$ROOT/scripts/merge-channel-manifests.sh" "$channel" v1.2.3 ghcr.test/sing-box docker.test/sing-box "" "$TMP/digests" 1.2.3 >/dev/null
+  grep -Fq -- '-t ghcr.test/sing-box:v1.2.3 ghcr.test/sing-box@' "$MOCK_LOG"
+  grep -Fq -- '-t docker.test/sing-box:v1.2.3 docker.test/sing-box@' "$MOCK_LOG"
+  if grep -Eq -- '-t [^ ]+:(latest|stable|testing)( |$)' "$MOCK_LOG"; then
+    echo 'explicit-version build changed a floating tag' >&2; exit 1
+  fi
+done
+
 # Validation failures must not publish either registry; publication failures must
 # still fail the step and leave version-record outputs unwritten.
 for failure in stage inspect json platform digest run version publish; do

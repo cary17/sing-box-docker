@@ -2,11 +2,12 @@
 set -euo pipefail
 export LC_ALL=C
 
-CHANNEL="${1:?usage: select-upstream-version.sh <stable|testing> <releases-json> [tags-json] [local-version] [tag-published-at]}"
-RELEASES_JSON="${2:?usage: select-upstream-version.sh <stable|testing> <releases-json> [tags-json] [local-version] [tag-published-at]}"
+CHANNEL="${1:?usage: select-upstream-version.sh <stable|testing> <releases-json> [tags-json] [local-version] [tag-published-at] [requested-version]}"
+RELEASES_JSON="${2:?usage: select-upstream-version.sh <stable|testing> <releases-json> [tags-json] [local-version] [tag-published-at] [requested-version]}"
 TAGS_JSON="${3:-}"
 LOCAL_VERSION="${4:-}"
 TAG_PUBLISHED_AT="${5:-now}"
+REQUESTED_VERSION="${6:-}"
 
 case "$CHANNEL" in
   stable)
@@ -42,14 +43,18 @@ docker_tag_for_version() {
 }
 
 local_key=""
-if [[ -n "$LOCAL_VERSION" ]]; then
+if [[ -n "$REQUESTED_VERSION" ]]; then
+  version_key "$REQUESTED_VERSION" >/dev/null || exit 1
+elif [[ -n "$LOCAL_VERSION" ]]; then
   local_key="$(version_key "$LOCAL_VERSION")" || exit 1
 fi
 
 release_rows="$(
-  jq -sr '
-    if length != 1 or (.[0] | type) != "array" then error("expected one releases array")
-    else .[0] end |
+  jq -sr --arg requested "$REQUESTED_VERSION" '
+    if length != 1 then error("expected one releases document")
+    elif $requested != "" and (.[0] | type) == "object" then [.[0]]
+    elif (.[0] | type) == "array" then .[0]
+    else error("expected one releases array") end |
     if all(.[]; type == "object" and
       (.tag_name | type == "string") and
       (.draft | type == "boolean") and (.prerelease | type == "boolean") and
@@ -57,6 +62,7 @@ release_rows="$(
       (.created_at | type == "null" or type == "string"))
     then . else error("invalid release record") end |
     .[] | '"${RELEASE_FILTER}"' | select(.tag_name | '"${RELEASE_TAG_FILTER}"') |
+    select($requested == "" or .tag_name == $requested) |
     if ((.published_at // .created_at) | type == "string" and length > 0)
     then [.tag_name, (.published_at // .created_at)] | @tsv
     else error("missing release timestamp") end
@@ -73,6 +79,11 @@ release_entry="$(
     sort -t $'\t' -k1,1 -k2,2 |
     tail -n 1
 )" || exit 1
+
+if [[ -n "$REQUESTED_VERSION" && -z "$release_entry" ]]; then
+  echo "requested ${CHANNEL} release not found: $REQUESTED_VERSION" >&2
+  exit 1
+fi
 
 if [[ -n "$release_entry" ]]; then
   release_version="$(cut -f3 <<< "$release_entry")"

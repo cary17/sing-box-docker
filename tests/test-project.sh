@@ -6,6 +6,40 @@ WORKFLOW="$ROOT/.github/workflows/build.yml"
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 
+# Execute the workflow's input normalization and channel routing unchanged.
+request="$(awk '
+  $0 == "        id: build_request" { inside = 1 }
+  inside && /^        run: \|$/ { capture = 1; next }
+  capture && /^      - name:/ { exit }
+  capture { print }
+' "$WORKFLOW")"
+[[ -n "$request" ]]
+while IFS='|' read -r branch version expected_channel expected_version expected_status; do
+  export SELECTED_BRANCH="$branch" REQUESTED_VERSION="$version" GITHUB_OUTPUT="$TMP/request-output"
+  : > "$GITHUB_OUTPUT"
+  if (cd "$ROOT" && bash -euo pipefail -c "$request") >"$TMP/request.log" 2>&1; then status=0; else status=$?; fi
+  [[ "$status" -eq "$expected_status" ]] || { cat "$TMP/request.log" >&2; exit 1; }
+  if [[ "$status" -eq 0 ]]; then
+    grep -Fxq "channel=$expected_channel" "$GITHUB_OUTPUT"
+    grep -Fxq "version=$expected_version" "$GITHUB_OUTPUT"
+  else
+    [[ ! -s "$GITHUB_OUTPUT" ]]
+  fi
+done <<'REQUESTS'
+both||both||0
+stable||stable||0
+testing||testing||0
+both|1.14.4|stable|v1.14.4-reF1nd|0
+stable|V1.14.4-reF1nd.1|stable|v1.14.4-reF1nd.1|0
+both|1.15.0-alpha.13|testing|v1.15.0-alpha.13-reF1nd|0
+testing|v1.15.0-alpha.13-reF1nd|testing|v1.15.0-alpha.13-reF1nd|0
+stable|1.15.0-alpha.13|||1
+testing|1.14.4|||1
+both|../invalid|||1
+both|v1.14.4-reF1nd.bad|||1
+REQUESTS
+unset REQUESTED_VERSION
+
 # Execute the actual workflow fetch commands after the upstream branch advances.
 git init -q --initial-branch=main "$TMP/upstream"
 printf 'FROM scratch\n' > "$TMP/upstream/Dockerfile.binary"
@@ -71,28 +105,47 @@ if grep -Eq 'go run|Dockerfile.ebpf|platform: linux/(386|arm/)' "$WORKFLOW"; the
   exit 1
 fi
 
-# Execute both production version-check guards, including helper failures.
+# Execute both production build decisions, including explicit old/same versions.
 for channel in stable testing; do
   guard="$(awk -v step="${channel}_check" '
     $0 == "        id: " step { inside = 1 }
-    inside && /source scripts\/version-key.sh/ { capture = 1 }
+    inside && /^        run: \|$/ { capture = 1; next }
     capture { print }
-    capture && /^          fi$/ { exit }
+    capture && /echo "need_build=/ { exit }
   ' "$WORKFLOW")"
   [[ -n "$guard" ]]
-  for result in valid empty_local invalid_current invalid_local; do
-    CURRENT=v1.2.3-reF1nd LOCAL=v1.2.2-reF1nd
+  for result in newer empty_local same older pinned_same pinned_older pinned_invalid_local forced invalid_current invalid_local; do
+    CURRENT=v1.2.3-reF1nd LOCAL=v1.2.2-reF1nd REQUESTED_VERSION="" SELECTED_BRANCH="$channel"
+    force=false expected=true
     case "$result" in
       empty_local) LOCAL="";;
-      invalid_current) CURRENT=invalid;;
-      invalid_local) LOCAL=invalid;;
+      same) LOCAL="$CURRENT"; expected=false;;
+      older) LOCAL=v1.2.4-reF1nd; expected=false;;
+      pinned_same) LOCAL="$CURRENT"; REQUESTED_VERSION="$CURRENT";;
+      pinned_older) LOCAL=v1.2.4-reF1nd; REQUESTED_VERSION="$CURRENT";;
+      pinned_invalid_local) LOCAL=invalid; REQUESTED_VERSION="$CURRENT";;
+      forced) LOCAL="$CURRENT"; force=true;;
+      invalid_current) CURRENT=invalid; expected=error;;
+      invalid_local) LOCAL=invalid; expected=error;;
     esac
-    if (cd "$ROOT" && export CURRENT LOCAL && bash -eu -c "$guard") >/dev/null 2>&1; then
-      [[ "$result" == valid || "$result" == empty_local ]]
+    export CURRENT LOCAL REQUESTED_VERSION SELECTED_BRANCH GITHUB_OUTPUT="$TMP/check-output"
+    : > "$GITHUB_OUTPUT"
+    # shellcheck disable=SC2016
+    expression='${{ github.event.inputs.force_build }}'
+    commands="${guard//"$expression"/"$force"}"
+    if (cd "$ROOT" && bash -euo pipefail -c "$commands") >"$TMP/check.log" 2>&1; then
+      [[ "$expected" != error ]]
+      grep -Fxq "need_build=$expected" "$GITHUB_OUTPUT"
     else
-      [[ "$result" == invalid_current || "$result" == invalid_local ]]
+      [[ "$expected" == error ]] || { cat "$TMP/check.log" >&2; exit 1; }
     fi
   done
 done
+
+# Pinned runs must skip floating-tag and version-record updates in both channels.
+# shellcheck disable=SC2016
+[[ "$(grep -Fc 'releases/tags/$REQUESTED_VERSION' "$WORKFLOW")" -eq 2 ]]
+[[ "$(grep -Fc "if: needs.check_versions.outputs.requested_version == ''" "$WORKFLOW")" -eq 2 ]]
+[[ "$(grep -Fc "needs.check_versions.outputs.requested_version == '' && " "$WORKFLOW")" -eq 2 ]]
 
 echo 'project checks passed'

@@ -5,7 +5,7 @@ CHANNEL="${1:?usage: merge-channel-manifests.sh <channel> <version-tag> <ghcr-im
 VERSION_TAG="${2:?missing version tag}"
 GHCR_IMAGE="${3:?missing GHCR image}"
 DOCKERHUB_IMAGE="${4:?missing Docker Hub image}"
-ALIASES="${5:?missing comma-separated aliases}"
+ALIASES="${5?missing comma-separated aliases}"
 DIGEST_DIR="${6:?missing digest directory}"
 SOURCE_VERSION="${7:?missing source version}"
 # ponytail: per-run staging tags remain; add registry retention if tag counts grow costly.

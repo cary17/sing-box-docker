@@ -46,4 +46,6 @@ docker compose up -d
 image: ghcr.io/cary17/sing-box:v1.14.0
 ```
 
-仅通过 GitHub Actions 手动触发检测与构建，不再定时检测上游。在 Actions 中选择 `Build reF1nd Sing-Box Docker Images`，点击 `Run workflow`，选择 Stable、Testing 或两者及用于获取 `Dockerfile.binary` 的上游分支。默认仅在检测到新版本时构建；勾选 `force_build` 可强制重建。
+仅通过 GitHub Actions 手动触发检测与构建，不再定时检测上游。在 Actions 中选择 `Build reF1nd Sing-Box Docker Images`，点击 `Run workflow`，选择 Stable、Testing 或两者及用于获取 `Dockerfile.binary` 的上游分支。可选的 `version` 留空时检测所选渠道的最新版本，仅在检测到新版本时构建；勾选 `force_build` 可强制重建。
+
+`version` 可填写 `1.14.4`、`v1.15.0-alpha.13-reF1nd` 或包含修订号的完整版本（如 `v1.14.0-reF1nd.1`）。指定版本时无需勾选 `force_build`，即使版本已构建或比当前记录更旧也会构建；`branch=both` 时只构建该版本所属渠道，选择不匹配的渠道则报错。版本必须存在于上游 Release 且具有对应的 musl 二进制。指定版本仅发布对应版本标签，不更新 `latest`、`stable`、`testing` 浮动标签及渠道版本记录。
