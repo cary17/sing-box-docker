@@ -1,13 +1,13 @@
 # reF1nd Sing-Box Docker
 
-手动触发检测并构建 [reF1nd/sing-box](https://github.com/reF1nd/sing-box) 的 Stable 与 Testing 多架构镜像。
+手动触发检测并构建 [reF1nd/sing-box](https://github.com/reF1nd/sing-box) 的 Stable 与 Testing 多架构镜像。使用上游 `Dockerfile.binary` 打包 [reF1nd/sing-box-releases](https://github.com/reF1nd/sing-box-releases/releases) 对应版本的 Linux musl 二进制，下载后校验 SHA256，不再从源码编译；功能以上游发布物为准，不额外添加 eBPF。
 
 ## 镜像
 
 - Stable：`ghcr.io/cary17/sing-box:latest` / `cary17/sing-box:latest`
 - Testing：`ghcr.io/cary17/sing-box:testing` / `cary17/sing-box:testing`
 
-支持 `amd64`、`arm64`、`386`、`arm/v7`、`arm/v6`。
+支持 `amd64`、`arm64`。
 
 ## 使用
 
@@ -46,4 +46,4 @@ docker compose up -d
 image: ghcr.io/cary17/sing-box:v1.14.0
 ```
 
-仅通过 GitHub Actions 手动触发检测与构建，不再定时检测上游。在 Actions 中选择 `Build reF1nd Sing-Box Docker Images`，点击 `Run workflow`，选择 Stable、Testing 或两者及对应上游分支。默认仅在检测到新版本时构建；勾选 `force_build` 可强制重建。
+仅通过 GitHub Actions 手动触发检测与构建，不再定时检测上游。在 Actions 中选择 `Build reF1nd Sing-Box Docker Images`，点击 `Run workflow`，选择 Stable、Testing 或两者及用于获取 `Dockerfile.binary` 的上游分支。默认仅在检测到新版本时构建；勾选 `force_build` 可强制重建。

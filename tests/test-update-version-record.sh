@@ -11,7 +11,7 @@ export GIT_COMMITTER_NAME=Test GIT_COMMITTER_EMAIL=test@example.invalid
 export GITHUB_REF_NAME=main
 printf -v SHA '%040d' 1
 printf -v HASH '%064d' 2
-ARGS=(stable v1.2.3-reF1nd 2026-01-01T00:00:00Z v1.2.3 reF1nd-stable "$SHA" "$HASH" "$HASH" "sha256:$HASH" "sha256:$HASH")
+ARGS=(stable v1.2.3-reF1nd 2026-01-01T00:00:00Z v1.2.3 reF1nd-stable "$SHA" "$HASH" "" "sha256:$HASH" "sha256:$HASH")
 
 git init -q --bare --initial-branch=main "$TMP/remote"
 git clone -q "$TMP/remote" "$TMP/seed" 2>/dev/null
@@ -57,7 +57,7 @@ git -C "$TMP/seed" commit -qm 'concurrent testing record'
 git -C "$TMP/seed" push -q origin main
 bash "$SCRIPT" "${ARGS[@]}" >"$TMP/success" 2>&1 || { cat "$TMP/success" >&2; exit 1; }
 [[ -z "$(git branch --show-current)" && -z "$(git status --porcelain)" ]]
-git --git-dir="$TMP/remote" show main:.github/version/stable.json | jq -e --arg sha "$SHA" '.channel == "stable" and .docker_tag == "v1.2.3" and .source_commit == $sha' >/dev/null
+git --git-dir="$TMP/remote" show main:.github/version/stable.json | jq -e --arg sha "$SHA" '.channel == "stable" and .docker_tag == "v1.2.3" and .source_commit == $sha and (has("ebpf_dockerfile_sha256") | not)' >/dev/null
 git --git-dir="$TMP/remote" show main:.github/version/testing.json | jq -e '.version == "v2.0.0"' >/dev/null
 
 # Real server-side push rejection must propagate; no false published result.

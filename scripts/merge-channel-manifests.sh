@@ -12,8 +12,8 @@ SOURCE_VERSION="${7:?missing source version}"
 STAGING_TAG="build-${GITHUB_RUN_ID:?}-${GITHUB_RUN_ATTEMPT:?}-${CHANNEL}"
 [[ "$CHANNEL" == stable || "$CHANNEL" == testing ]] || { echo "invalid channel: $CHANNEL" >&2; exit 1; }
 
-SLUGS=(amd64 arm64 386 arm-v7 arm-v6)
-EXPECTED_PLATFORMS=(linux/amd64 linux/arm64 linux/386 linux/arm/v7 linux/arm/v6)
+SLUGS=(amd64 arm64)
+EXPECTED_PLATFORMS=(linux/amd64 linux/arm64)
 
 merge_registry() {
   local image="$1"
@@ -30,8 +30,7 @@ merge_registry() {
   # Explicit returns also work inside command substitutions, where errexit is cleared.
   docker buildx imagetools create -t "${image}:${STAGING_TAG}" "${sources[@]}" >&2 || return 1
   manifest="$(docker buildx imagetools inspect "${image}:${STAGING_TAG}" --format '{{json .Manifest}}')" || return 1
-  # docker buildx 会把 linux/arm64 报告为 linux/arm64/v8；等价的 arm64 表示需正规化，
-  # 其余 variant 以及 arm/v6、arm/v7 必须原样保留。
+  # docker buildx 会把 linux/arm64 报告为 linux/arm64/v8；等价的 arm64 表示需正规化。
   actual="$(jq -r '
     .manifests[]
     | select(.platform.os != "unknown")
@@ -52,8 +51,6 @@ verify_image() {
   output="$(docker run --rm --platform linux/amd64 "$1@$2" version)" || return 1
   printf '%s\n' "$output"
   grep -Fx "sing-box version $SOURCE_VERSION" <<< "$output" || return 1
-  sed -n 's/^Tags: //p' <<< "$output" | tr ',' '\n' | grep -Fx 'with_ebpf' || return 1
-  grep -Fx 'CGO: disabled' <<< "$output" || return 1
 }
 
 publish_registry() {

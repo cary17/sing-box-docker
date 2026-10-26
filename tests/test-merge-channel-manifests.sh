@@ -22,11 +22,9 @@ if [[ "$*" == *'imagetools create'* ]]; then
 fi
 if [[ "$1" == run ]]; then
   [[ "$failure" != run ]] || exit 1
-  version=1.2.3 tags=with_ebpf cgo=disabled
+  version=1.2.3
   [[ "$failure" != version ]] || version=0.0.0
-  [[ "$failure" != tags ]] || tags=with_quic
-  [[ "$failure" != cgo ]] || cgo=enabled
-  printf 'sing-box version %s\nTags: %s\nCGO: %s\n' "$version" "$tags" "$cgo"
+  printf 'sing-box version %s\nTags: with_quic,with_musl\nCGO: enabled\n' "$version"
   exit 0
 fi
 if [[ "$*" == *"imagetools inspect"* ]]; then
@@ -41,10 +39,7 @@ if [[ "$*" == *"imagetools inspect"* ]]; then
   ' <<'JSON'
 {"manifests":[
 {"platform":{"os":"linux","architecture":"amd64"}},
-{"platform":{"os":"linux","architecture":"arm64"}},
-{"platform":{"os":"linux","architecture":"386"}},
-{"platform":{"os":"linux","architecture":"arm","variant":"v7"}},
-{"platform":{"os":"linux","architecture":"arm","variant":"v6"}}
+{"platform":{"os":"linux","architecture":"arm64"}}
 ]}
 JSON
 fi
@@ -59,7 +54,7 @@ export MANIFEST_DIGEST='sha256:ccccccccccccccccccccccccccccccccccccccccccccccccc
 GHCR_DIGEST='sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
 DOCKERHUB_DIGEST='sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'
 mkdir "$TMP/digests"
-for slug in amd64 arm64 386 arm-v7 arm-v6; do
+for slug in amd64 arm64; do
   printf '%s\n' "$GHCR_DIGEST" > "$TMP/digests/ghcr-$slug"
   printf '%s\n' "$DOCKERHUB_DIGEST" > "$TMP/digests/dockerhub-$slug"
 done
@@ -101,7 +96,7 @@ fi
 
 # Validation failures must not publish either registry; publication failures must
 # still fail the step and leave version-record outputs unwritten.
-for failure in stage inspect json platform digest run version tags cgo publish; do
+for failure in stage inspect json platform digest run version publish; do
   : > "$MOCK_LOG"
   : > "$GITHUB_OUTPUT"
   export MOCK_FAILURE="$failure"
@@ -117,7 +112,7 @@ for failure in stage inspect json platform digest run version tags cgo publish; 
 done
 unset MOCK_FAILURE
 
-rm "$TMP/digests/ghcr-arm-v6"
+rm "$TMP/digests/ghcr-arm64"
 if bash "$ROOT/scripts/merge-channel-manifests.sh" stable v1.2.3 ghcr.test/sing-box docker.test/sing-box latest,stable "$TMP/digests" 1.2.3 >/dev/null 2>&1; then
   echo 'missing digest unexpectedly passed' >&2
   exit 1

@@ -299,7 +299,7 @@ jobs:
 
   # ==================== 构建稳定版 ====================
   prepare_stable:
-    name: 准备稳定版源码
+    name: 准备稳定版二进制镜像构建
     runs-on: ubuntu-latest
     needs: check_versions
     if: >-
@@ -308,7 +308,6 @@ jobs:
     outputs:
       source_commit: ${{ steps.source.outputs.source_commit }}
       dockerfile_sha256: ${{ steps.source.outputs.dockerfile_sha256 }}
-      ebpf_dockerfile_sha256: ${{ steps.ebpf.outputs.sha256 }}
       source_version: ${{ steps.source.outputs.source_version }}
     steps:
       - name: Checkout Current Repo
@@ -316,34 +315,18 @@ jobs:
         with:
           path: repo-tools
           ref: ${{ github.sha }}
-      - name: 固定上游源码
+      - name: 固定上游 Dockerfile.binary
         id: source
         env:
           EXPECTED_VERSION: ${{ needs.check_versions.outputs.stable_version }}
         run: |
           git clone --depth 1 --branch "${{ env.UPSTREAM_STABLE_BRANCH }}" "${{ env.UPSTREAM_REPO }}" src
-          if ! SOURCE_VERSION="$(cd src && go run ./cmd/internal/read_tag)" ||
-            [[ -z "$SOURCE_VERSION" || "$SOURCE_VERSION" == "unknown" ]]; then
-            echo "Failed to determine upstream source version" >&2
-            exit 1
-          fi
-          # 只去掉一个前导 v/V 后完整比较；修订号与预发布后缀必须逐字符一致。
-          ACTUAL_VERSION="${SOURCE_VERSION#[vV]}"
-          EXPECTED_NORMALIZED="${EXPECTED_VERSION#[vV]}"
-          if [[ "$ACTUAL_VERSION" != "$EXPECTED_NORMALIZED" ]]; then
-            echo "Upstream source version mismatch: expected '${EXPECTED_VERSION}' (normalized '${EXPECTED_NORMALIZED}'), got '${SOURCE_VERSION}' (normalized '${ACTUAL_VERSION}')" >&2
-            exit 1
-          fi
+          test -f src/Dockerfile.binary
           {
             echo "source_commit=$(git -C src rev-parse HEAD)"
-            echo "dockerfile_sha256=$(sha256sum src/Dockerfile | cut -d' ' -f1)"
-            echo "source_version=$SOURCE_VERSION"
+            echo "dockerfile_sha256=$(sha256sum src/Dockerfile.binary | cut -d' ' -f1)"
+            echo "source_version=${EXPECTED_VERSION#[vV]}"
           } >> "$GITHUB_OUTPUT"
-      - name: 生成稳定版 eBPF Dockerfile 摘要
-        id: ebpf
-        run: |
-          bash repo-tools/scripts/prepare-ebpf-dockerfile.sh src/Dockerfile src/Dockerfile.ebpf
-          echo "sha256=$(sha256sum src/Dockerfile.ebpf | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
 
   build_stable:
     name: 构建稳定版镜像 (${{ matrix.platform }})
@@ -357,12 +340,6 @@ jobs:
             slug: amd64
           - platform: linux/arm64
             slug: arm64
-          - platform: linux/386
-            slug: 386
-          - platform: linux/arm/v7
-            slug: arm-v7
-          - platform: linux/arm/v6
-            slug: arm-v6
     permissions:
       contents: read
       packages: write
@@ -389,13 +366,14 @@ jobs:
             sleep $((attempt * 2))
           done
           [[ "$(git -C src rev-parse HEAD)" == "${{ needs.prepare_stable.outputs.source_commit }}" ]]
-          [[ "$(sha256sum src/Dockerfile | cut -d' ' -f1)" == "${{ needs.prepare_stable.outputs.dockerfile_sha256 }}" ]]
+          [[ "$(sha256sum src/Dockerfile.binary | cut -d' ' -f1)" == "${{ needs.prepare_stable.outputs.dockerfile_sha256 }}" ]]
           echo "代码克隆完成"
 
-      - name: 生成稳定版 eBPF Dockerfile
-        run: |
-          bash repo-tools/scripts/prepare-ebpf-dockerfile.sh src/Dockerfile src/Dockerfile.ebpf
-          [[ "$(sha256sum src/Dockerfile.ebpf | cut -d' ' -f1)" == "${{ needs.prepare_stable.outputs.ebpf_dockerfile_sha256 }}" ]]
+      - name: 下载稳定版发布二进制
+        env:
+          RELEASE_VERSION: ${{ needs.check_versions.outputs.stable_version }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: bash repo-tools/scripts/download-release-binary.sh "$RELEASE_VERSION" "${{ matrix.slug }}" src
 
       - name: Setup QEMU
         uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3
@@ -421,7 +399,7 @@ jobs:
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
         with:
           context: src
-          file: src/Dockerfile.ebpf
+          file: src/Dockerfile.binary
           platforms: ${{ matrix.platform }}
           sbom: true
           provenance: mode=max
@@ -433,7 +411,7 @@ jobs:
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
         with:
           context: src
-          file: src/Dockerfile.ebpf
+          file: src/Dockerfile.binary
           platforms: ${{ matrix.platform }}
           sbom: true
           provenance: mode=max
@@ -454,7 +432,7 @@ jobs:
 
   # ==================== 构建测试版 ====================
   prepare_testing:
-    name: 准备测试版源码
+    name: 准备测试版二进制镜像构建
     runs-on: ubuntu-latest
     needs: check_versions
     if: >-
@@ -463,7 +441,6 @@ jobs:
     outputs:
       source_commit: ${{ steps.source.outputs.source_commit }}
       dockerfile_sha256: ${{ steps.source.outputs.dockerfile_sha256 }}
-      ebpf_dockerfile_sha256: ${{ steps.ebpf.outputs.sha256 }}
       source_version: ${{ steps.source.outputs.source_version }}
     steps:
       - name: Checkout Current Repo
@@ -471,34 +448,18 @@ jobs:
         with:
           path: repo-tools
           ref: ${{ github.sha }}
-      - name: 固定上游源码并验证 eBPF Dockerfile
+      - name: 固定上游 Dockerfile.binary
         id: source
         env:
           EXPECTED_VERSION: ${{ needs.check_versions.outputs.testing_version }}
         run: |
           git clone --depth 1 --branch "${{ env.UPSTREAM_TESTING_BRANCH }}" "${{ env.UPSTREAM_REPO }}" src
-          if ! SOURCE_VERSION="$(cd src && go run ./cmd/internal/read_tag)" ||
-            [[ -z "$SOURCE_VERSION" || "$SOURCE_VERSION" == "unknown" ]]; then
-            echo "Failed to determine upstream source version" >&2
-            exit 1
-          fi
-          # 只去掉一个前导 v/V 后完整比较；修订号与预发布后缀必须逐字符一致。
-          ACTUAL_VERSION="${SOURCE_VERSION#[vV]}"
-          EXPECTED_NORMALIZED="${EXPECTED_VERSION#[vV]}"
-          if [[ "$ACTUAL_VERSION" != "$EXPECTED_NORMALIZED" ]]; then
-            echo "Upstream source version mismatch: expected '${EXPECTED_VERSION}' (normalized '${EXPECTED_NORMALIZED}'), got '${SOURCE_VERSION}' (normalized '${ACTUAL_VERSION}')" >&2
-            exit 1
-          fi
+          test -f src/Dockerfile.binary
           {
             echo "source_commit=$(git -C src rev-parse HEAD)"
-            echo "dockerfile_sha256=$(sha256sum src/Dockerfile | cut -d' ' -f1)"
-            echo "source_version=$SOURCE_VERSION"
+            echo "dockerfile_sha256=$(sha256sum src/Dockerfile.binary | cut -d' ' -f1)"
+            echo "source_version=${EXPECTED_VERSION#[vV]}"
           } >> "$GITHUB_OUTPUT"
-      - name: 生成 eBPF Dockerfile摘要
-        id: ebpf
-        run: |
-          bash repo-tools/scripts/prepare-ebpf-dockerfile.sh src/Dockerfile src/Dockerfile.ebpf
-          echo "sha256=$(sha256sum src/Dockerfile.ebpf | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
 
   build_testing:
     name: 构建测试版镜像 (${{ matrix.platform }})
@@ -512,12 +473,6 @@ jobs:
             slug: amd64
           - platform: linux/arm64
             slug: arm64
-          - platform: linux/386
-            slug: 386
-          - platform: linux/arm/v7
-            slug: arm-v7
-          - platform: linux/arm/v6
-            slug: arm-v6
     permissions:
       contents: read
       packages: write
@@ -545,13 +500,14 @@ jobs:
             sleep $((attempt * 2))
           done
           [[ "$(git -C src rev-parse HEAD)" == "${{ needs.prepare_testing.outputs.source_commit }}" ]]
-          [[ "$(sha256sum src/Dockerfile | cut -d' ' -f1)" == "${{ needs.prepare_testing.outputs.dockerfile_sha256 }}" ]]
+          [[ "$(sha256sum src/Dockerfile.binary | cut -d' ' -f1)" == "${{ needs.prepare_testing.outputs.dockerfile_sha256 }}" ]]
           echo "代码克隆完成"
 
-      - name: 生成 eBPF Dockerfile
-        run: |
-          bash repo-tools/scripts/prepare-ebpf-dockerfile.sh src/Dockerfile src/Dockerfile.ebpf
-          [[ "$(sha256sum src/Dockerfile.ebpf | cut -d' ' -f1)" == "${{ needs.prepare_testing.outputs.ebpf_dockerfile_sha256 }}" ]]
+      - name: 下载测试版发布二进制
+        env:
+          RELEASE_VERSION: ${{ needs.check_versions.outputs.testing_version }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: bash repo-tools/scripts/download-release-binary.sh "$RELEASE_VERSION" "${{ matrix.slug }}" src
 
       - name: Setup QEMU
         uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3
@@ -577,7 +533,7 @@ jobs:
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
         with:
           context: src
-          file: src/Dockerfile.ebpf
+          file: src/Dockerfile.binary
           platforms: ${{ matrix.platform }}
           sbom: true
           provenance: mode=max
@@ -589,7 +545,7 @@ jobs:
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
         with:
           context: src
-          file: src/Dockerfile.ebpf
+          file: src/Dockerfile.binary
           platforms: ${{ matrix.platform }}
           sbom: true
           provenance: mode=max
@@ -657,7 +613,7 @@ jobs:
             "${{ env.UPSTREAM_STABLE_BRANCH }}" \
             "${{ needs.prepare_stable.outputs.source_commit }}" \
             "${{ needs.prepare_stable.outputs.dockerfile_sha256 }}" \
-            "${{ needs.prepare_stable.outputs.ebpf_dockerfile_sha256 }}" \
+            "" \
             "${{ steps.merge.outputs.ghcr_digest }}" \
             "${{ steps.merge.outputs.dockerhub_digest }}"
 
@@ -712,6 +668,6 @@ jobs:
             "${{ env.UPSTREAM_TESTING_BRANCH }}" \
             "${{ needs.prepare_testing.outputs.source_commit }}" \
             "${{ needs.prepare_testing.outputs.dockerfile_sha256 }}" \
-            "${{ needs.prepare_testing.outputs.ebpf_dockerfile_sha256 }}" \
+            "" \
             "${{ steps.merge.outputs.ghcr_digest }}" \
             "${{ steps.merge.outputs.dockerhub_digest }}"
