@@ -105,7 +105,22 @@ for channel in stable testing; do
   done
 done
 
-[[ "$(grep -Fc 'build-args: BASE_IMAGE=public.ecr.aws/docker/library/alpine:latest' "$WORKFLOW")" -eq 4 ]]
+for channel in stable testing; do
+  builder="$(awk -v job="build_${channel}:" '
+    $0 == "  " job { inside = 1; next }
+    inside && /^  [a-z_]+:/ { exit }
+    inside && /name: Setup Docker Buildx$/ { capture = 1; next }
+    capture && /^      - name:/ { exit }
+    capture { print }
+  ' "$WORKFLOW")"
+  grep -Fxq '          buildkitd-config-inline: |' <<< "$builder"
+  grep -Fxq '            [registry."docker.io"]' <<< "$builder"
+  grep -Fxq '              mirrors = ["mirror.gcr.io"]' <<< "$builder"
+done
+if grep -q 'BASE_IMAGE=' "$WORKFLOW"; then
+  echo 'base image override bypasses the Docker Hub mirror' >&2
+  exit 1
+fi
 
 # Execute both production build decisions, including historical builds and invalid records.
 for channel in stable testing; do
