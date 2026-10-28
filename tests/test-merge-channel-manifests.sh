@@ -12,8 +12,14 @@ printf '%s\n' "$*" >> "$MOCK_LOG"
 failure=""
 if [[ "$*" == *docker.test/* ]]; then failure="${MOCK_FAILURE:-}"; fi
 if [[ "$*" == *'imagetools create'* ]]; then
+  if [[ "$4" == --dry-run ]]; then
+    [[ "$failure" != preview ]] || exit 1
+    printf '%s\n' "$MERGED_MANIFEST"
+    exit 0
+  fi
   echo 'mock create output must not contaminate digest'
-  if [[ "$*" == *':build-'* ]]; then
+  if [[ "$5" == *@sha256:* ]]; then
+    [[ "$5" == *@"$MANIFEST_DIGEST" ]] || exit 1
     [[ "$failure" != stage ]]
   else
     [[ "$failure" != publish ]]
@@ -28,6 +34,7 @@ if [[ "$1" == run ]]; then
   exit 0
 fi
 if [[ "$*" == *"imagetools inspect"* ]]; then
+  [[ "$4" == *@"$MANIFEST_DIGEST" ]] || exit 1
   [[ "$failure" != inspect ]] || exit 1
   if [[ "$failure" == json ]]; then echo '{'; exit 0; fi
   jq --arg failure "$failure" --arg digest "$MANIFEST_DIGEST" \
@@ -35,13 +42,9 @@ if [[ "$*" == *"imagetools inspect"* ]]; then
     .digest = $digest
     | if $failure == "platform" then .manifests |= .[:1] else . end
     | if $failure == "digest" then .digest = "sha256:invalid" else . end
+    | if $failure == "mismatch" then .digest = ("sha256:" + ("0" * 64)) else . end
     | if $arm64_variant != "" then .manifests |= map(if .platform.architecture == "arm64" then .platform.variant = $arm64_variant else . end) else . end
-  ' <<'JSON'
-{"manifests":[
-{"platform":{"os":"linux","architecture":"amd64"}},
-{"platform":{"os":"linux","architecture":"arm64"}}
-]}
-JSON
+  ' <<< "$MERGED_MANIFEST"
 fi
 MOCK
 chmod +x "$TMP/docker"
@@ -49,8 +52,12 @@ chmod +x "$TMP/docker"
 export PATH="$TMP:$PATH"
 export MOCK_LOG="$TMP/docker.log"
 export GITHUB_OUTPUT="$TMP/output"
-export GITHUB_RUN_ID=123 GITHUB_RUN_ATTEMPT=1
-export MANIFEST_DIGEST='sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc'
+export MERGED_MANIFEST='{"manifests":[
+{"platform":{"os":"linux","architecture":"amd64"}},
+{"platform":{"os":"linux","architecture":"arm64"}}
+]}'
+MANIFEST_DIGEST="sha256:$(printf '%s' "$MERGED_MANIFEST" | sha256sum | cut -d' ' -f1)"
+export MANIFEST_DIGEST
 GHCR_DIGEST='sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
 DOCKERHUB_DIGEST='sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'
 mkdir "$TMP/digests"
@@ -69,11 +76,16 @@ grep -Fq "docker.test/sing-box@$DOCKERHUB_DIGEST" "$MOCK_LOG"
 grep -Fq -- '-t ghcr.test/sing-box:v1.2.3 -t ghcr.test/sing-box:latest -t ghcr.test/sing-box:stable' "$MOCK_LOG"
 grep -Fx "ghcr_digest=$MANIFEST_DIGEST" "$GITHUB_OUTPUT"
 grep -Fx "dockerhub_digest=$MANIFEST_DIGEST" "$GITHUB_OUTPUT"
-# Both immutable image references must be checked before the first public tag.
+# Staging uses only digests; both images must pass before any public tag changes.
 awk '
+  /:build-/ { exit 1 }
   /^run / { checked++; if ($0 !~ /@sha256:/) exit 1 }
-  /imagetools create/ && !/:build-/ { if (checked != 2) exit 1; published++ }
-  END { if (checked != 2 || published != 2) exit 1 }
+  /imagetools create --dry-run/ { previewed++; next }
+  /imagetools create/ {
+    if ($5 ~ /@sha256:/) staged++
+    else { if (checked != 2) exit 1; published++ }
+  }
+  END { if (previewed != 2 || staged != 2 || checked != 2 || published != 2) exit 1 }
 ' "$MOCK_LOG"
 
 # 修订版只发布完整精确标签和渠道浮动标签，不得额外发布基础版本标签。
@@ -107,7 +119,7 @@ done
 
 # Validation failures must not publish either registry; publication failures must
 # still fail the step and leave version-record outputs unwritten.
-for failure in stage inspect json platform digest run version publish; do
+for failure in preview stage inspect json platform digest mismatch run version publish; do
   : > "$MOCK_LOG"
   : > "$GITHUB_OUTPUT"
   export MOCK_FAILURE="$failure"
@@ -116,7 +128,7 @@ for failure in stage inspect json platform digest run version publish; do
     exit 1
   fi
   [[ ! -s "$GITHUB_OUTPUT" ]]
-  if [[ "$failure" != publish ]] && grep 'imagetools create' "$MOCK_LOG" | grep -qv ':build-'; then
+  if [[ "$failure" != publish ]] && grep 'imagetools create -t' "$MOCK_LOG" | grep -qvE ' -t [^ ]+@sha256:[0-9a-f]+ '; then
     echo "public tag changed before $failure validation" >&2
     exit 1
   fi
