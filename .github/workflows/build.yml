@@ -43,9 +43,11 @@ permissions:
   contents: read
 
 concurrency:
-  group: build-${{ github.workflow }}-${{ github.ref }}
-  # 同一分支的新手动运行取消旧运行，避免重复构建与版本记录回写冲突。
-  cancel-in-progress: true
+  # 各分支共享构建队列，避免并行更新相同镜像标签。
+  group: build-sing-box
+  cancel-in-progress: false
+  # ponytail: 原生队列最多保留 100 个等待项，超出时需外部调度。
+  queue: max
 
 env:
   # 上游仓库配置

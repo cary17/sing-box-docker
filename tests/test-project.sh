@@ -6,6 +6,10 @@ WORKFLOW="$ROOT/.github/workflows/build.yml"
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 
+grep -Fxq '  group: build-sing-box' "$WORKFLOW"
+grep -Fxq '  cancel-in-progress: false' "$WORKFLOW"
+grep -Fxq '  queue: max' "$WORKFLOW"
+
 # Execute the workflow's input normalization and channel routing unchanged.
 request="$(awk '
   $0 == "        id: build_request" { inside = 1 }
