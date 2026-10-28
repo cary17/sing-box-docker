@@ -109,6 +109,7 @@ for channel in stable testing; do
 done
 
 [[ "$(grep -Fc 'file: src/Dockerfile.binary' "$WORKFLOW")" -eq 4 ]]
+[[ "$(grep -Fc 'build-args: BASE_IMAGE=public.ecr.aws/docker/library/alpine:latest' "$WORKFLOW")" -eq 4 ]]
 [[ "$(grep -Fc 'run: bash repo-tools/scripts/download-release-binary.sh' "$WORKFLOW")" -eq 2 ]]
 if grep -Eq 'go run|Dockerfile.ebpf|platform: linux/(386|arm/)' "$WORKFLOW"; then
   echo 'workflow still uses source builds or unsupported release architectures' >&2

@@ -500,6 +500,7 @@ jobs:
         with:
           context: src
           file: src/Dockerfile.binary
+          build-args: BASE_IMAGE=public.ecr.aws/docker/library/alpine:latest
           platforms: ${{ matrix.platform }}
           sbom: true
           provenance: mode=max
@@ -512,6 +513,7 @@ jobs:
         with:
           context: src
           file: src/Dockerfile.binary
+          build-args: BASE_IMAGE=public.ecr.aws/docker/library/alpine:latest
           platforms: ${{ matrix.platform }}
           sbom: true
           provenance: mode=max
@@ -629,6 +631,7 @@ jobs:
         with:
           context: src
           file: src/Dockerfile.binary
+          build-args: BASE_IMAGE=public.ecr.aws/docker/library/alpine:latest
           platforms: ${{ matrix.platform }}
           sbom: true
           provenance: mode=max
@@ -641,6 +644,7 @@ jobs:
         with:
           context: src
           file: src/Dockerfile.binary
+          build-args: BASE_IMAGE=public.ecr.aws/docker/library/alpine:latest
           platforms: ${{ matrix.platform }}
           sbom: true
           provenance: mode=max
