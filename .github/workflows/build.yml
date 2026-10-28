@@ -88,6 +88,8 @@ jobs:
           SELECTED_BRANCH: ${{ github.event.inputs.branch || 'both' }}
         run: |
           CHANNEL="$SELECTED_BRANCH"
+          REQUESTED_VERSION="${REQUESTED_VERSION#"${REQUESTED_VERSION%%[![:space:]]*}"}"
+          REQUESTED_VERSION="${REQUESTED_VERSION%"${REQUESTED_VERSION##*[![:space:]]}"}"
           if [[ -n "$REQUESTED_VERSION" ]]; then
             REQUESTED_VERSION="v${REQUESTED_VERSION#[vV]}"
             if [[ "$REQUESTED_VERSION" != *-reF1nd* ]]; then

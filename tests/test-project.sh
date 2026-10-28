@@ -29,6 +29,12 @@ done <<'REQUESTS'
 both||both||0
 stable||stable||0
 testing||testing||0
+both|v1.13.21-reF1nd |stable|v1.13.21-reF1nd|0
+both|1.13.21-reF1nd |stable|v1.13.21-reF1nd|0
+both|1.13.21 |stable|v1.13.21-reF1nd|0
+both| v1.15.0-alpha.13-reF1nd |testing|v1.15.0-alpha.13-reF1nd|0
+both|   |both||0
+both|1.13. 21|||1
 both|1.14.4|stable|v1.14.4-reF1nd|0
 stable|V1.14.4-reF1nd.1|stable|v1.14.4-reF1nd.1|0
 both|1.15.0-alpha.13|testing|v1.15.0-alpha.13-reF1nd|0
