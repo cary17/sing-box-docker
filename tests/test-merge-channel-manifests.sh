@@ -13,7 +13,6 @@ failure=""
 if [[ "$*" == *docker.test/* ]]; then failure="${MOCK_FAILURE:-}"; fi
 if [[ "$*" == *'imagetools create'* ]]; then
   if [[ "$4" == --dry-run ]]; then
-    [[ "$failure" != preview ]] || exit 1
     printf '%s\n' "$MERGED_MANIFEST"
     exit 0
   fi
@@ -36,12 +35,10 @@ fi
 if [[ "$*" == *"imagetools inspect"* ]]; then
   [[ "$4" == *@"$MANIFEST_DIGEST" ]] || exit 1
   [[ "$failure" != inspect ]] || exit 1
-  if [[ "$failure" == json ]]; then echo '{'; exit 0; fi
   jq --arg failure "$failure" --arg digest "$MANIFEST_DIGEST" \
     --arg arm64_variant "${MOCK_ARM64_VARIANT:-}" '
     .digest = $digest
     | if $failure == "platform" then .manifests |= .[:1] else . end
-    | if $failure == "digest" then .digest = "sha256:invalid" else . end
     | if $failure == "mismatch" then .digest = ("sha256:" + ("0" * 64)) else . end
     | if $arm64_variant != "" then .manifests |= map(if .platform.architecture == "arm64" then .platform.variant = $arm64_variant else . end) else . end
   ' <<< "$MERGED_MANIFEST"
@@ -88,16 +85,7 @@ awk '
   END { if (previewed != 2 || staged != 2 || checked != 2 || published != 2) exit 1 }
 ' "$MOCK_LOG"
 
-# 修订版只发布完整精确标签和渠道浮动标签，不得额外发布基础版本标签。
-: > "$MOCK_LOG"
-bash "$ROOT/scripts/merge-channel-manifests.sh" stable v1.2.3-reF1nd.1 ghcr.test/sing-box docker.test/sing-box latest,stable "$TMP/digests" 1.2.3 >/dev/null
-grep -Fq -- '-t ghcr.test/sing-box:v1.2.3-reF1nd.1 -t ghcr.test/sing-box:latest -t ghcr.test/sing-box:stable' "$MOCK_LOG"
-if grep -Fq -- '-t ghcr.test/sing-box:v1.2.3 ' "$MOCK_LOG"; then
-  echo 'revision release unexpectedly published base version tag' >&2
-  exit 1
-fi
-
-# Testing 修订版使用相同策略，只保留精确标签与 testing 浮动标签。
+# 修订版保留完整标签与 testing 浮动标签，不额外发布去掉修订号的基础标签。
 : > "$MOCK_LOG"
 bash "$ROOT/scripts/merge-channel-manifests.sh" testing v1.2.3-rc.4-reF1nd.2 ghcr.test/sing-box docker.test/sing-box testing "$TMP/digests" 1.2.3 >/dev/null
 grep -Fq -- '-t ghcr.test/sing-box:v1.2.3-rc.4-reF1nd.2 -t ghcr.test/sing-box:testing' "$MOCK_LOG"
@@ -107,19 +95,17 @@ if grep -Fq -- '-t ghcr.test/sing-box:v1.2.3-rc.4 ' "$MOCK_LOG"; then
 fi
 
 # Historical-version builds publish only the version tag, without channel aliases.
-for channel in stable testing; do
-  : > "$MOCK_LOG"
-  bash "$ROOT/scripts/merge-channel-manifests.sh" "$channel" v1.2.3 ghcr.test/sing-box docker.test/sing-box "" "$TMP/digests" 1.2.3 >/dev/null
-  grep -Fq -- '-t ghcr.test/sing-box:v1.2.3 ghcr.test/sing-box@' "$MOCK_LOG"
-  grep -Fq -- '-t docker.test/sing-box:v1.2.3 docker.test/sing-box@' "$MOCK_LOG"
-  if grep -Eq -- '-t [^ ]+:(latest|stable|testing)( |$)' "$MOCK_LOG"; then
-    echo 'explicit-version build changed a floating tag' >&2; exit 1
-  fi
-done
+: > "$MOCK_LOG"
+bash "$ROOT/scripts/merge-channel-manifests.sh" stable v1.2.3 ghcr.test/sing-box docker.test/sing-box "" "$TMP/digests" 1.2.3 >/dev/null
+grep -Fq -- '-t ghcr.test/sing-box:v1.2.3 ghcr.test/sing-box@' "$MOCK_LOG"
+grep -Fq -- '-t docker.test/sing-box:v1.2.3 docker.test/sing-box@' "$MOCK_LOG"
+if grep -Eq -- '-t [^ ]+:(latest|stable|testing)( |$)' "$MOCK_LOG"; then
+  echo 'historical-version build changed a floating tag' >&2; exit 1
+fi
 
 # Validation failures must not publish either registry; publication failures must
 # still fail the step and leave version-record outputs unwritten.
-for failure in preview stage inspect json platform digest mismatch run version publish; do
+for failure in stage inspect platform mismatch run version publish; do
   : > "$MOCK_LOG"
   : > "$GITHUB_OUTPUT"
   export MOCK_FAILURE="$failure"

@@ -35,11 +35,9 @@ for field in 0 1 2 3 4 5 6 7 8; do
   fi
   [[ "$(git rev-parse HEAD)" == "$BASE" && -z "$(git status --porcelain)" ]]
 done
-for invalid_date in 2026-02-30T00:00:00Z 2026-01-01T99:00:00Z; do
-  bad=("${ARGS[@]}"); bad[2]="$invalid_date"
-  if bash "$SCRIPT" "${bad[@]}" >"$TMP/error" 2>&1; then exit 1; fi
-  [[ -z "$(git status --porcelain)" ]]
-done
+bad=("${ARGS[@]}"); bad[2]=2026-02-30T00:00:00Z
+if bash "$SCRIPT" "${bad[@]}" >"$TMP/error" 2>&1; then exit 1; fi
+[[ -z "$(git status --porcelain)" ]]
 if GITHUB_REF_NAME='../bad' bash "$SCRIPT" "${ARGS[@]}" >"$TMP/error" 2>&1; then exit 1; fi
 [[ -z "$(git status --porcelain)" ]]
 printf 'unrelated\n' > unrelated

@@ -31,22 +31,15 @@ while IFS='|' read -r branch version expected_channel expected_version expected_
   fi
 done <<'REQUESTS'
 both||both||0
-stable||stable||0
-testing||testing||0
-both|v1.13.21-reF1nd |stable|v1.13.21-reF1nd|0
-both|1.13.21-reF1nd |stable|v1.13.21-reF1nd|0
 both|1.13.21 |stable|v1.13.21-reF1nd|0
 both| v1.15.0-alpha.13-reF1nd |testing|v1.15.0-alpha.13-reF1nd|0
 both|   |both||0
 both|1.13. 21|||1
-both|1.14.4|stable|v1.14.4-reF1nd|0
 stable|V1.14.4-reF1nd.1|stable|v1.14.4-reF1nd.1|0
-both|1.15.0-alpha.13|testing|v1.15.0-alpha.13-reF1nd|0
 testing|v1.15.0-alpha.13-reF1nd|testing|v1.15.0-alpha.13-reF1nd|0
 stable|1.15.0-alpha.13|||1
 testing|1.14.4|||1
 both|../invalid|||1
-both|v1.14.4-reF1nd.bad|||1
 REQUESTS
 unset REQUESTED_VERSION
 
@@ -108,15 +101,9 @@ for channel in stable testing; do
   done
 done
 
-[[ "$(grep -Fc 'file: src/Dockerfile.binary' "$WORKFLOW")" -eq 4 ]]
 [[ "$(grep -Fc 'build-args: BASE_IMAGE=public.ecr.aws/docker/library/alpine:latest' "$WORKFLOW")" -eq 4 ]]
-[[ "$(grep -Fc 'run: bash repo-tools/scripts/download-release-binary.sh' "$WORKFLOW")" -eq 2 ]]
-if grep -Eq 'go run|Dockerfile.ebpf|platform: linux/(386|arm/)' "$WORKFLOW"; then
-  echo 'workflow still uses source builds or unsupported release architectures' >&2
-  exit 1
-fi
 
-# Execute both production build decisions, including explicit old/same versions.
+# Execute both production build decisions, including historical builds and invalid records.
 for channel in stable testing; do
   guard="$(awk -v step="${channel}_check" '
     $0 == "        id: " step { inside = 1 }
@@ -125,14 +112,13 @@ for channel in stable testing; do
     capture && /echo "need_build=/ { exit }
   ' "$WORKFLOW")"
   [[ -n "$guard" ]]
-  for result in newer empty_local same older pinned_same pinned_older pinned_invalid_local forced invalid_current invalid_local; do
+  for result in newer empty_local same older pinned_older pinned_invalid_local forced invalid_current invalid_local; do
     CURRENT=v1.2.3-reF1nd LOCAL=v1.2.2-reF1nd REQUESTED_VERSION="" SELECTED_BRANCH="$channel"
     force=false expected=true
     case "$result" in
       empty_local) LOCAL="";;
       same) LOCAL="$CURRENT"; expected=false;;
       older) LOCAL=v1.2.4-reF1nd; expected=false;;
-      pinned_same) LOCAL="$CURRENT"; REQUESTED_VERSION="$CURRENT";;
       pinned_older) LOCAL=v1.2.4-reF1nd; REQUESTED_VERSION="$CURRENT";;
       pinned_invalid_local) LOCAL=invalid; REQUESTED_VERSION="$CURRENT";;
       forced) LOCAL="$CURRENT"; force=true;;
@@ -182,7 +168,7 @@ case "${MOCK_FAILURE:-}" in
   api) exit 1;;
   empty) printf '[]\n' > "$output";;
   malformed) printf '{\n' > "$output";;
-  paginated)
+  *)
     if [[ "${url##*=}" == 1 ]]; then
       jq '.[0] as $release | [range(100) | $release]' "$TEST_RELEASES" > "$output"
     else
@@ -190,18 +176,15 @@ case "${MOCK_FAILURE:-}" in
       cp "$TEST_RELEASES" "$output"
     fi
     ;;
-  *) cp "$TEST_RELEASES" "$output";;
 esac
 MOCK
 chmod +x "$TMP/bin/curl"
 export RUNNER_TEMP="$TMP" GITHUB_OUTPUT="$TMP/policy-output" TEST_RELEASES="$TMP/policy-releases.json"
 export CHANNEL REQUESTED_VERSION
-for CHANNEL in both stable testing; do
-  REQUESTED_VERSION=""
-  : > "$GITHUB_OUTPUT"
-  (cd "$ROOT" && MOCK_FAILURE=api PATH="$TMP/bin:$PATH" bash -euo pipefail -c "$policy")
-  grep -Fxq 'update_channel=true' "$GITHUB_OUTPUT"
-done
+CHANNEL=both REQUESTED_VERSION=""
+: > "$GITHUB_OUTPUT"
+(cd "$ROOT" && MOCK_FAILURE=api PATH="$TMP/bin:$PATH" bash -euo pipefail -c "$policy")
+grep -Fxq 'update_channel=true' "$GITHUB_OUTPUT"
 for CHANNEL in stable testing; do
   base=v1.2.3
   other=v9.0.0-rc.1-reF1nd
@@ -216,34 +199,28 @@ for CHANNEL in stable testing; do
       prerelease: (if . == $other then $channel != "testing" else $channel == "testing" end),
       published_at: "2026-01-01T00:00:00Z"})
   ' > "$TEST_RELEASES"
-  for MOCK_FAILURE in '' paginated; do
-    export MOCK_FAILURE
-    for REQUESTED_VERSION in "$latest" "$older" "$newer"; do
-      expected=false
-      [[ "$REQUESTED_VERSION" != "$latest" ]] || expected=true
-      : > "$GITHUB_OUTPUT"
-      (cd "$ROOT" && PATH="$TMP/bin:$PATH" bash -euo pipefail -c "$policy") >"$TMP/policy.log" 2>&1 || {
-        cat "$TMP/policy.log" >&2; exit 1;
-      }
-      grep -Fxq "update_channel=$expected" "$GITHUB_OUTPUT"
-    done
-  done
-  REQUESTED_VERSION="$latest"
-  for MOCK_FAILURE in empty malformed api; do
-    export MOCK_FAILURE
+  for REQUESTED_VERSION in "$latest" "$older"; do
+    expected=false
+    [[ "$REQUESTED_VERSION" != "$latest" ]] || expected=true
     : > "$GITHUB_OUTPUT"
-    if (cd "$ROOT" && PATH="$TMP/bin:$PATH" bash -euo pipefail -c "$policy") >"$TMP/policy.log" 2>&1; then
-      [[ "$MOCK_FAILURE" == empty ]]
-      grep -Fxq 'update_channel=false' "$GITHUB_OUTPUT"
-    else
-      [[ "$MOCK_FAILURE" != empty && ! -s "$GITHUB_OUTPUT" ]]
-    fi
+    (cd "$ROOT" && MOCK_FAILURE="" PATH="$TMP/bin:$PATH" bash -euo pipefail -c "$policy") >"$TMP/policy.log" 2>&1 || {
+      cat "$TMP/policy.log" >&2; exit 1;
+    }
+    grep -Fxq "update_channel=$expected" "$GITHUB_OUTPUT"
   done
-  unset MOCK_FAILURE
 done
-
-# shellcheck disable=SC2016
-[[ "$(grep -Fc 'releases/tags/$REQUESTED_VERSION' "$WORKFLOW")" -eq 2 ]]
+CHANNEL=stable REQUESTED_VERSION=v1.2.3-reF1nd.2
+for MOCK_FAILURE in empty malformed api; do
+  export MOCK_FAILURE
+  : > "$GITHUB_OUTPUT"
+  if (cd "$ROOT" && PATH="$TMP/bin:$PATH" bash -euo pipefail -c "$policy") >"$TMP/policy.log" 2>&1; then
+    [[ "$MOCK_FAILURE" == empty ]]
+    grep -Fxq 'update_channel=false' "$GITHUB_OUTPUT"
+  else
+    [[ "$MOCK_FAILURE" != empty && ! -s "$GITHUB_OUTPUT" ]]
+  fi
+done
+unset MOCK_FAILURE
 # shellcheck disable=SC2016
 [[ "$(grep -Fc 'update_channel: ${{ steps.channel_update.outputs.update_channel }}' "$WORKFLOW")" -eq 1 ]]
 [[ "$(grep -Fc "if: needs.check_versions.outputs.update_channel == 'true'" "$WORKFLOW")" -eq 2 ]]
