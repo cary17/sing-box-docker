@@ -1,0 +1,27 @@
+Upstream sing-box notice
+
+This repository packages releases from https://github.com/reF1nd/sing-box.
+The original project is https://github.com/SagerNet/sing-box.
+
+The following notice is reproduced verbatim from:
+https://github.com/reF1nd/sing-box/blob/732618a5989cd2566f072c374fe2f619200f33f9/LICENSE
+It also matches the original project's notice at:
+https://github.com/SagerNet/sing-box/blob/e5d91fa79f6319d5de940d6c81d81f0fe53b9476/LICENSE
+
+Copyright (C) 2022 by nekohasekai <contact-sagernet@sekai.icu>
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program. If not, see <http://www.gnu.org/licenses/>.
+
+In addition, no derivative work may use the name or imply association
+with this application without prior consent.
