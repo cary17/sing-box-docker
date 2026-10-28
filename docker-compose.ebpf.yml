@@ -1,5 +1,6 @@
 services:
   sing-box:
+    #image: cary17/sing-box:testing
     image: ghcr.io/cary17/sing-box:latest
     container_name: sing-box
     restart: unless-stopped
@@ -10,6 +11,7 @@ services:
     cap_add:
       - BPF
       - NET_ADMIN
+      - NET_RAW
       - PERFMON
     security_opt:
       - no-new-privileges:true
@@ -19,9 +21,5 @@ services:
         hard: -1
     volumes:
       - ./conf:/etc/sing-box/
-      - sing-box-data:/var/lib/sing-box
       - /run/dbus:/run/dbus:ro
     command: -D /var/lib/sing-box -C /etc/sing-box/ run
-
-volumes:
-  sing-box-data:
