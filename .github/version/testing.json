@@ -1,0 +1,12 @@
+{
+  "channel": "testing",
+  "version": "v1.15.0-alpha.13-reF1nd",
+  "published_at": "2026-10-25T23:23:45+08:00",
+  "built_at": "2026-10-28T17:17:19+08:00",
+  "docker_tag": "v1.15.0-alpha.13",
+  "source_branch": "reF1nd-testing",
+  "source_commit": "17397d022647b73378705e1f91ff031dddaaec21",
+  "dockerfile_sha256": "2c2e955afa2b99fb9c709907f22e1a5796624216b9f000eb54a93d8743fedd36",
+  "ghcr_digest": "sha256:735b2b1c18a0c5d4478b450d713eba23e66a43134b192695c2d18e51084585a4",
+  "dockerhub_digest": "sha256:32e82460755bf0adbf99a399fbb60b6243947b4587f3f345f90d35412ca1230b"
+}
