@@ -53,7 +53,6 @@ env:
   UPSTREAM_STABLE_BRANCH: "${{ github.event.inputs.stable_upstream_branch || 'reF1nd-stable' }}"
   UPSTREAM_TESTING_BRANCH: "${{ github.event.inputs.testing_upstream_branch || 'reF1nd-testing' }}"
   UPSTREAM_RELEASES_REPO: "reF1nd/sing-box-releases"
-  UPSTREAM_SOURCE_REPO: "reF1nd/sing-box"
 
   # 镜像仓库配置
   GHCR_IMAGE: "ghcr.io/${{ github.repository_owner }}/sing-box"
@@ -414,11 +413,6 @@ jobs:
       dockerfile_sha256: ${{ steps.source.outputs.dockerfile_sha256 }}
       source_version: ${{ steps.source.outputs.source_version }}
     steps:
-      - name: Checkout Current Repo
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          path: repo-tools
-          ref: ${{ github.sha }}
       - name: 固定上游 Dockerfile.binary
         id: source
         env:
@@ -547,11 +541,6 @@ jobs:
       dockerfile_sha256: ${{ steps.source.outputs.dockerfile_sha256 }}
       source_version: ${{ steps.source.outputs.source_version }}
     steps:
-      - name: Checkout Current Repo
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          path: repo-tools
-          ref: ${{ github.sha }}
       - name: 固定上游 Dockerfile.binary
         id: source
         env:
@@ -718,7 +707,6 @@ jobs:
             "${{ env.UPSTREAM_STABLE_BRANCH }}" \
             "${{ needs.prepare_stable.outputs.source_commit }}" \
             "${{ needs.prepare_stable.outputs.dockerfile_sha256 }}" \
-            "" \
             "${{ steps.merge.outputs.ghcr_digest }}" \
             "${{ steps.merge.outputs.dockerhub_digest }}"
 
@@ -736,8 +724,6 @@ jobs:
           ref: ${{ github.sha }}
           token: ${{ secrets.GITHUB_TOKEN }}
           fetch-depth: 0
-      - name: Setup QEMU
-        uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
       - name: Setup Docker Buildx
         uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
       - name: Login to GHCR
@@ -774,6 +760,5 @@ jobs:
             "${{ env.UPSTREAM_TESTING_BRANCH }}" \
             "${{ needs.prepare_testing.outputs.source_commit }}" \
             "${{ needs.prepare_testing.outputs.dockerfile_sha256 }}" \
-            "" \
             "${{ steps.merge.outputs.ghcr_digest }}" \
             "${{ steps.merge.outputs.dockerhub_digest }}"
