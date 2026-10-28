@@ -106,7 +106,7 @@ if grep -Fq -- '-t ghcr.test/sing-box:v1.2.3-rc.4 ' "$MOCK_LOG"; then
   exit 1
 fi
 
-# Explicit-version builds publish only the version tag, without channel aliases.
+# Historical-version builds publish only the version tag, without channel aliases.
 for channel in stable testing; do
   : > "$MOCK_LOG"
   bash "$ROOT/scripts/merge-channel-manifests.sh" "$channel" v1.2.3 ghcr.test/sing-box docker.test/sing-box "" "$TMP/digests" 1.2.3 >/dev/null

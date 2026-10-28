@@ -65,7 +65,7 @@ jobs:
     name: 检测上游版本
     runs-on: ubuntu-latest
     outputs:
-      requested_version: ${{ steps.build_request.outputs.version }}
+      update_channel: ${{ steps.channel_update.outputs.update_channel }}
       stable_version: ${{ steps.stable_version.outputs.version }}
       stable_published_at: ${{ steps.stable_version.outputs.published_at }}
       stable_docker_tag: ${{ steps.stable_version.outputs.docker_tag }}
@@ -353,6 +353,53 @@ jobs:
           fi
 
           echo "need_build=${NEED}" >> "$GITHUB_OUTPUT"
+
+      - name: 判断是否更新渠道浮动标签与版本记录
+        id: channel_update
+        env:
+          REQUESTED_VERSION: ${{ steps.build_request.outputs.version }}
+          CHANNEL: ${{ steps.build_request.outputs.channel }}
+        run: |
+          UPDATE_CHANNEL=true
+          if [[ -n "$REQUESTED_VERSION" ]]; then
+            UPDATE_CHANNEL=false
+            RELEASES_DIR="$(mktemp -d "$RUNNER_TEMP/latest-channel-releases.XXXXXX")"
+            PAGE=1
+            while :; do
+              PAGE_JSON="$RELEASES_DIR/$PAGE.json"
+              curl -fsSL \
+                --retry 3 \
+                --retry-delay 2 \
+                --retry-all-errors \
+                --connect-timeout 15 \
+                --max-time 120 \
+                -H "Accept: application/vnd.github+json" \
+                -H "Authorization: Bearer ${{ github.token }}" \
+                -H "X-GitHub-Api-Version: 2022-11-28" \
+                "https://api.github.com/repos/${{ env.UPSTREAM_RELEASES_REPO }}/releases?per_page=100&page=$PAGE" \
+                -o "$PAGE_JSON"
+              PAGE_SIZE="$(jq -es '
+                if length == 1 and (.[0] | type) == "array" then .[0] | length
+                else error("expected one releases array") end
+              ' "$PAGE_JSON")"
+              [[ "$PAGE_SIZE" -eq 100 ]] || break
+              PAGE=$((PAGE + 1))
+            done
+            RELEASES_JSON="$RUNNER_TEMP/latest-channel-releases.json"
+            jq -s 'add' "$RELEASES_DIR"/*.json > "$RELEASES_JSON"
+            if LATEST="$(bash scripts/select-upstream-version.sh "$CHANNEL" "$RELEASES_JSON")"; then
+              source scripts/version-key.sh
+              REQUESTED_KEY="$(version_key "$REQUESTED_VERSION")"
+              LATEST_KEY="$(version_key "$(jq -r '.version' <<< "$LATEST")")"
+              if [[ "$REQUESTED_KEY" == "$LATEST_KEY" ]]; then
+                UPDATE_CHANNEL=true
+              fi
+            else
+              STATUS=$?
+              [[ "$STATUS" -eq 3 ]] || exit "$STATUS"
+            fi
+          fi
+          echo "update_channel=$UPDATE_CHANNEL" >> "$GITHUB_OUTPUT"
 
   # ==================== 构建稳定版 ====================
   prepare_stable:
@@ -659,10 +706,10 @@ jobs:
         run: |
           bash scripts/merge-channel-manifests.sh stable \
             "${{ needs.check_versions.outputs.stable_docker_tag }}" \
-            "${{ env.GHCR_IMAGE }}" "${{ env.DOCKERHUB_IMAGE }}" "${{ needs.check_versions.outputs.requested_version == '' && 'latest,stable' || '' }}" \
+            "${{ env.GHCR_IMAGE }}" "${{ env.DOCKERHUB_IMAGE }}" "${{ needs.check_versions.outputs.update_channel == 'true' && 'latest,stable' || '' }}" \
             "$RUNNER_TEMP/digests" "${{ needs.prepare_stable.outputs.source_version }}"
       - name: 更新稳定版版本记录
-        if: needs.check_versions.outputs.requested_version == ''
+        if: needs.check_versions.outputs.update_channel == 'true'
         run: |
           bash scripts/update-version-record.sh stable \
             "${{ needs.check_versions.outputs.stable_version }}" \
@@ -715,10 +762,10 @@ jobs:
         run: |
           bash scripts/merge-channel-manifests.sh testing \
             "${{ needs.check_versions.outputs.testing_docker_tag }}" \
-            "${{ env.GHCR_IMAGE }}" "${{ env.DOCKERHUB_IMAGE }}" "${{ needs.check_versions.outputs.requested_version == '' && 'testing' || '' }}" \
+            "${{ env.GHCR_IMAGE }}" "${{ env.DOCKERHUB_IMAGE }}" "${{ needs.check_versions.outputs.update_channel == 'true' && 'testing' || '' }}" \
             "$RUNNER_TEMP/digests" "${{ needs.prepare_testing.outputs.source_version }}"
       - name: 更新测试版版本记录
-        if: needs.check_versions.outputs.requested_version == ''
+        if: needs.check_versions.outputs.update_channel == 'true'
         run: |
           bash scripts/update-version-record.sh testing \
             "${{ needs.check_versions.outputs.testing_version }}" \

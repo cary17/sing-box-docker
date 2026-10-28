@@ -148,10 +148,100 @@ for channel in stable testing; do
   done
 done
 
-# Pinned runs must skip floating-tag and version-record updates in both channels.
+# Execute the shared channel-update decision used by both tags and records.
+policy="$(awk '
+  $0 == "        id: channel_update" { inside = 1 }
+  inside && /^        run: \|$/ { capture = 1; next }
+  capture { print }
+  capture && /echo "update_channel=/ { exit }
+' "$WORKFLOW")"
+[[ -n "$policy" ]]
+# shellcheck disable=SC2016
+policy="${policy//'${{ env.UPSTREAM_RELEASES_REPO }}'/reF1nd/sing-box-releases}"
+# shellcheck disable=SC2016
+policy="${policy//'${{ github.token }}'/test-token}"
+mkdir "$TMP/bin"
+cat > "$TMP/bin/curl" <<'MOCK'
+#!/usr/bin/env bash
+set -euo pipefail
+url="" output=""
+while [[ "$#" -gt 0 ]]; do
+  case "$1" in
+    -o) output="$2"; shift 2;;
+    https://*) url="$1"; shift;;
+    *) shift;;
+  esac
+done
+[[ "$url" == 'https://api.github.com/repos/reF1nd/sing-box-releases/releases?per_page=100&page='* ]]
+case "${MOCK_FAILURE:-}" in
+  api) exit 1;;
+  empty) printf '[]\n' > "$output";;
+  malformed) printf '{\n' > "$output";;
+  paginated)
+    if [[ "${url##*=}" == 1 ]]; then
+      jq '.[0] as $release | [range(100) | $release]' "$TEST_RELEASES" > "$output"
+    else
+      [[ "${url##*=}" == 2 ]]
+      cp "$TEST_RELEASES" "$output"
+    fi
+    ;;
+  *) cp "$TEST_RELEASES" "$output";;
+esac
+MOCK
+chmod +x "$TMP/bin/curl"
+export RUNNER_TEMP="$TMP" GITHUB_OUTPUT="$TMP/policy-output" TEST_RELEASES="$TMP/policy-releases.json"
+export CHANNEL REQUESTED_VERSION
+for CHANNEL in both stable testing; do
+  REQUESTED_VERSION=""
+  : > "$GITHUB_OUTPUT"
+  (cd "$ROOT" && MOCK_FAILURE=api PATH="$TMP/bin:$PATH" bash -euo pipefail -c "$policy")
+  grep -Fxq 'update_channel=true' "$GITHUB_OUTPUT"
+done
+for CHANNEL in stable testing; do
+  base=v1.2.3
+  other=v9.0.0-rc.1-reF1nd
+  if [[ "$CHANNEL" == testing ]]; then
+    base=v1.2.3-rc.10
+    other=v9.0.0-reF1nd
+  fi
+  latest="$base-reF1nd.2" older="$base-reF1nd.1" newer="$base-reF1nd.3"
+  jq -n --arg channel "$CHANNEL" --arg latest "$latest" --arg older "$older" \
+    --arg newer "$newer" --arg other "$other" '
+    [$older, $latest, $newer, $other] | map({tag_name: ., draft: (. == $newer),
+      prerelease: (if . == $other then $channel != "testing" else $channel == "testing" end),
+      published_at: "2026-01-01T00:00:00Z"})
+  ' > "$TEST_RELEASES"
+  for MOCK_FAILURE in '' paginated; do
+    export MOCK_FAILURE
+    for REQUESTED_VERSION in "$latest" "$older" "$newer"; do
+      expected=false
+      [[ "$REQUESTED_VERSION" != "$latest" ]] || expected=true
+      : > "$GITHUB_OUTPUT"
+      (cd "$ROOT" && PATH="$TMP/bin:$PATH" bash -euo pipefail -c "$policy") >"$TMP/policy.log" 2>&1 || {
+        cat "$TMP/policy.log" >&2; exit 1;
+      }
+      grep -Fxq "update_channel=$expected" "$GITHUB_OUTPUT"
+    done
+  done
+  REQUESTED_VERSION="$latest"
+  for MOCK_FAILURE in empty malformed api; do
+    export MOCK_FAILURE
+    : > "$GITHUB_OUTPUT"
+    if (cd "$ROOT" && PATH="$TMP/bin:$PATH" bash -euo pipefail -c "$policy") >"$TMP/policy.log" 2>&1; then
+      [[ "$MOCK_FAILURE" == empty ]]
+      grep -Fxq 'update_channel=false' "$GITHUB_OUTPUT"
+    else
+      [[ "$MOCK_FAILURE" != empty && ! -s "$GITHUB_OUTPUT" ]]
+    fi
+  done
+  unset MOCK_FAILURE
+done
+
 # shellcheck disable=SC2016
 [[ "$(grep -Fc 'releases/tags/$REQUESTED_VERSION' "$WORKFLOW")" -eq 2 ]]
-[[ "$(grep -Fc "if: needs.check_versions.outputs.requested_version == ''" "$WORKFLOW")" -eq 2 ]]
-[[ "$(grep -Fc "needs.check_versions.outputs.requested_version == '' && " "$WORKFLOW")" -eq 2 ]]
+# shellcheck disable=SC2016
+[[ "$(grep -Fc 'update_channel: ${{ steps.channel_update.outputs.update_channel }}' "$WORKFLOW")" -eq 1 ]]
+[[ "$(grep -Fc "if: needs.check_versions.outputs.update_channel == 'true'" "$WORKFLOW")" -eq 2 ]]
+[[ "$(grep -Fc "needs.check_versions.outputs.update_channel == 'true' && " "$WORKFLOW")" -eq 2 ]]
 
 echo 'project checks passed'
