@@ -10,6 +10,10 @@ grep -Fxq '  group: build-sing-box' "$WORKFLOW"
 grep -Fxq '  cancel-in-progress: false' "$WORKFLOW"
 grep -Fxq '  queue: max' "$WORKFLOW"
 
+grep -Fxq '  UPSTREAM_STABLE_BRANCH: "reF1nd-stable"' "$WORKFLOW"
+grep -Fxq '  UPSTREAM_TESTING_BRANCH: "reF1nd-testing"' "$WORKFLOW"
+[[ "$(grep -Ec '(stable|testing)_upstream_branch' "$WORKFLOW")" -eq 0 ]]
+
 # Execute the workflow's input normalization and channel routing unchanged.
 request="$(awk '
   $0 == "        id: build_request" { inside = 1 }
