@@ -1,0 +1,12 @@
+{
+  "channel": "stable",
+  "version": "v1.14.4-reF1nd",
+  "published_at": "2026-10-27T00:46:03+08:00",
+  "built_at": "2026-10-28T17:17:15+08:00",
+  "docker_tag": "v1.14.4",
+  "source_branch": "reF1nd-stable",
+  "source_commit": "732618a5989cd2566f072c374fe2f619200f33f9",
+  "dockerfile_sha256": "2c2e955afa2b99fb9c709907f22e1a5796624216b9f000eb54a93d8743fedd36",
+  "ghcr_digest": "sha256:14b749e0d128ad1e77831b9990d2be9f6c33ff41baf3cb611b6f9c231cdddc86",
+  "dockerhub_digest": "sha256:37494a072eefb4e99b1c36e0f65f0b6c5bb3e2f04063fa2670697c3fee7b7645"
+}
